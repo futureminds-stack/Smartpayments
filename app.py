@@ -1147,6 +1147,16 @@ def approve_user(user_id):
             except Exception as e:
                 logger.error(f"Wallet init error for {updated['public_user_id']}: {e}")
 
+            # Credit the referrer's actual wallet balance with the ₹100
+            # bonus. The Postgres `amount_earned` update above is just a
+            # display stat - this is what actually moves spendable money.
+            if updated and updated.get("referral_id"):
+                try:
+                    wallet.credit_wallet(updated["referral_id"], 100.00,
+                                          reason="Referral bonus")
+                except Exception as e:
+                    logger.error(f"Referral wallet credit error for {updated['referral_id']}: {e}")
+
     except Exception as e:
         conn.rollback()
         logger.error(f"Approve user error: {e}")
