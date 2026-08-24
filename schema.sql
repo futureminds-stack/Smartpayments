@@ -1,4 +1,3 @@
-
 -- Drop old tables if you want a fresh start (BACKUP DATA FIRST!)
 -- If you have existing data, use ALTER TABLE instead (see comments below)
 
