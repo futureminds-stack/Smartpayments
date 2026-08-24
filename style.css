@@ -1,0 +1,624 @@
+/* ─── Global ─────────────────────────────────────────────── */
+:root {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    /* Saffron -> India Green, standing in for the old indigo/violet pair.
+       Kept at the same lightness/saturation "weight" as the original
+       (#6366f1 / #8b5cf6) so every existing glow, shadow and opacity value
+       elsewhere in this file still reads correctly - only the hue moved. */
+    --accent: #6366f1;
+    --accent-secondary: #8b5cf6;
+    --accent-glow: rgba(99, 102, 241, 0.35);
+    --text-primary: #f8fafc;
+    --text-muted: #cbd5e1;
+    --border: rgba(255, 255, 255, 0.14);
+    --glass-fill: rgba(255, 255, 255, 0.10);
+    --glass-fill-strong: rgba(255, 255, 255, 0.16);
+    --glass-blur: 28px;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Dynamic nature wallpaper (iPhone-style Liquid Glass background) ── */
+.wallpaper-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 2.5s ease-in-out;
+    will-change: opacity;
+}
+
+.wallpaper-layer.active {
+    opacity: 1;
+}
+
+.wallpaper-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    /* Darkens/cools the photo just enough that white glass text stays readable
+       over any wallpaper, without hiding the scenery */
+    background:
+        linear-gradient(180deg, rgba(8, 12, 22, 0.55) 0%, rgba(8, 12, 22, 0.35) 40%, rgba(8, 12, 22, 0.65) 100%);
+}
+
+/* ─── Auth Pages ─────────────────────────────────────────── */
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+}
+
+.auth-glass {
+    position: relative;
+    background: linear-gradient(135deg, var(--glass-fill-strong), var(--glass-fill));
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+    box-shadow:
+        0 25px 60px -12px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.auth-logo {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.35), rgba(255,255,255,0.08));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    color: white;
+    margin: 0 auto 1rem;
+    box-shadow: 0 0 24px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+/* ─── Form Controls ──────────────────────────────────────── */
+.form-control, .input-group-text {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 14px;
+    padding: 0.65rem 1rem;
+    transition: all 0.2s;
+}
+
+.form-control:focus {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    color: var(--text-primary);
+}
+
+.form-control[readonly] {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.input-group-text {
+    border-right: none;
+}
+
+.input-group .form-control {
+    border-left: none;
+}
+
+.input-group .form-control:focus + .btn,
+.input-group .btn {
+    border-color: var(--border);
+}
+
+/* ─── Buttons ────────────────────────────────────────────── */
+.btn-glow {
+    background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+    border: none;
+    padding: 0.75rem;
+    border-radius: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    box-shadow: 0 8px 20px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.25);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+
+.btn-glow:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+    box-shadow: 0 14px 30px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.btn-glow:active {
+    transform: translateY(0);
+    filter: brightness(0.98);
+}
+
+.btn-outline-light, .btn-outline-secondary {
+    backdrop-filter: blur(8px);
+    border-radius: 14px;
+    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-outline-light:hover, .btn-outline-secondary:hover {
+    transform: translateY(-1px);
+    border-color: var(--accent);
+}
+
+/* Generic lift-on-hover for every ordinary button, so nothing in the app
+   feels static when it's clickable. */
+.btn {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.btn:hover { filter: brightness(1.04); }
+.btn:active { transform: translateY(0) scale(0.99); }
+
+/* ─── Waiting Page ───────────────────────────────────────── */
+.status-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: white;
+    margin: 0 auto;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35);
+}
+
+.pulse {
+    animation: pulse-animation 2s infinite;
+}
+
+@keyframes pulse-animation {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+/* ─── Cards (glass panels everywhere: dashboard, admin, etc.) ──────── */
+.card {
+    background: linear-gradient(135deg, var(--glass-fill-strong), var(--glass-fill));
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: 0 20px 40px -18px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+
+.card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    border-top-left-radius: 22px !important;
+    border-top-right-radius: 22px !important;
+}
+
+.referral-box {
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.25);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 20px 40px -18px rgba(0,0,0,0.5);
+}
+
+/* ─── Tables ─────────────────────────────────────────────── */
+.table-dark {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text-primary);
+    --bs-table-border-color: var(--border);
+}
+
+.table-dark thead th {
+    border-bottom: 2px solid var(--border);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+
+.table-hover > tbody > tr {
+    transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.table-hover > tbody > tr:hover {
+    --bs-table-accent-bg: rgba(99, 102, 241, 0.08);
+    transform: translateX(2px);
+}
+
+.badge {
+    transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+/* ─── Toast ──────────────────────────────────────────────── */
+.toast {
+    background: linear-gradient(135deg, var(--glass-fill-strong), var(--glass-fill));
+    backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 12px 30px -10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* ─── Navbar (glass) ─────────────────────────────────────── */
+.navbar, .navbar-glass {
+    background: linear-gradient(135deg, var(--glass-fill-strong), var(--glass-fill)) !important;
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+
+.navbar-brand { transition: opacity 0.2s ease, letter-spacing 0.2s ease; }
+.navbar-brand:hover { opacity: 0.85; }
+
+.nav-link, .dropdown-item {
+    transition: color 0.2s ease, background-color 0.2s ease, padding-left 0.2s ease;
+}
+.dropdown-item:hover, .dropdown-item:focus {
+    background: var(--glass-fill-strong);
+    color: var(--text-primary);
+    padding-left: 1.15rem;
+}
+
+/* Any plain text link in a card/body gets a gentle underline sweep on
+   hover instead of Bootstrap's flat color swap. */
+a.text-decoration-none:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+
+/* ─── Modal (glass) ──────────────────────────────────────── */
+.modal-content {
+    background: linear-gradient(135deg, rgba(20,26,40,0.85), rgba(10,14,24,0.92));
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+
+/* ─── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .auth-glass { padding: 1.5rem; border-radius: 22px; }
+    .stat-card { padding: 1rem; }
+}
+
+/* ─── Reduced motion / low-power fallback ───────────────────
+   Respect the user's OS-level preference: skip the crossfade animation
+   and just let the background swap instantly if they've asked for less
+   motion. */
+@media (prefers-reduced-motion: reduce) {
+    .wallpaper-layer { transition: none; }
+}
+
+/* ─── Admin nav bar (shared by admin dashboard + network explorer) ── */
+.admin-nav { position: relative; background: rgba(15,23,42,0.98); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+/* ═══════════════════════════════════════════════════════════
+   Hex Network — referral constellation visualization
+   ═══════════════════════════════════════════════════════════ */
+.hexnet-svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+.hexnet-node { cursor: pointer; outline: none; }
+.hexnet-node:focus-visible .hexnet-hexagon,
+.hexnet-node:focus-visible .hexnet-dot { stroke: #fff; stroke-width: 3; }
+
+.hexnet-hexagon {
+    fill: rgba(99, 102, 241, 0.18);
+    stroke: var(--lvl, var(--accent));
+    stroke-width: 2.5;
+    filter: drop-shadow(0 0 10px var(--lvl, var(--accent-glow)));
+    transition: fill 0.25s ease, transform 0.2s ease;
+    transform-origin: center;
+    transform-box: fill-box;
+}
+.hexnet-node:hover .hexnet-hexagon { fill: rgba(99, 102, 241, 0.34); transform: scale(1.06); }
+
+.hexnet-hex-label {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
+.hexnet-spoke { stroke: rgba(255, 255, 255, 0.22); stroke-width: 1.5; stroke-dasharray: 3 4; }
+
+.hexnet-dot {
+    stroke: rgba(255, 255, 255, 0.55);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.45));
+    transition: filter 0.2s ease, r 0.15s ease;
+}
+.hexnet-node:hover .hexnet-dot { filter: drop-shadow(0 0 7px currentColor) drop-shadow(0 0 3px rgba(0,0,0,0.5)); }
+
+.hexnet-dot-ring {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.4);
+    stroke-width: 1.4;
+    stroke-dasharray: 2 3;
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: hexnet-spin 14s linear infinite;
+}
+@keyframes hexnet-spin { to { transform: rotate(360deg); } }
+
+.hexnet-sat-label { fill: var(--text-muted); font-size: 10.5px; font-weight: 600; pointer-events: none; }
+.hexnet-empty-label { fill: var(--text-muted); font-size: 12px; text-anchor: middle; font-style: italic; }
+
+/* Tooltip (single floating element, reused across every constellation) */
+.hexnet-tooltip {
+    position: fixed; top: 0; left: 0; z-index: 3000;
+    min-width: 190px; max-width: 240px;
+    padding: 0.65rem 0.85rem;
+    background: linear-gradient(135deg, rgba(30,36,54,0.97), rgba(12,16,26,0.97));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 16px 34px -12px rgba(0,0,0,0.6);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+}
+.hexnet-tooltip.visible { opacity: 1; }
+.hexnet-tooltip-name { font-weight: 700; margin-bottom: 0.3rem; }
+.hexnet-tooltip-row { display: flex; align-items: center; gap: 0.35rem; color: var(--text-muted); margin-top: 0.15rem; }
+.hexnet-tooltip-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.hexnet-tooltip-muted { font-size: 0.72rem; opacity: 0.85; }
+.hexnet-tooltip-hint { color: #a5b4fc; font-size: 0.72rem; margin-top: 0.4rem; }
+
+/* Legend */
+.hexnet-legend-group { display: inline-flex; align-items: center; gap: 0.6rem; margin-right: 1.5rem; flex-wrap: wrap; }
+.hexnet-legend-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-right: 0.15rem; }
+.hexnet-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; color: var(--text-muted); }
+.hexnet-legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.hexnet-legend-hex { width: 11px; height: 11px; display: inline-block; background: var(--lvl); clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+
+/* Toolbar / stat pills / live indicator */
+.hexnet-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; justify-content: space-between; }
+.hexnet-stat-pill { background: var(--glass-fill); border: 1px solid var(--border); border-radius: 999px; padding: 0.35rem 0.9rem; font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+.hexnet-stat-pill strong { color: var(--text-primary); }
+.hexnet-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block; margin-right: 0.35rem; animation: hexnet-live-pulse 2s infinite; }
+@keyframes hexnet-live-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.55); }
+    70% { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+    100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+}
+
+/* Overview: n-ary referral-chain forest on the left, unreferred/no-downline
+   users as a compact side panel on the right */
+.hexnet-forest-layout { display: grid; grid-template-columns: 1fr 260px; gap: 1.5rem; align-items: start; }
+.hexnet-forest-heading { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 0.75rem; }
+.hexnet-forest-trees { background: var(--glass-fill); border: 1px solid var(--border); border-radius: 20px; padding: 1.25rem; min-height: 160px; }
+.hexnet-forest-scroll { display: flex; flex-wrap: wrap; gap: 2rem; overflow-x: auto; padding-bottom: 0.5rem; }
+.hexnet-forest-solo { background: var(--glass-fill); border: 1px solid var(--border); border-radius: 20px; padding: 1.25rem; max-height: 560px; overflow-y: auto; }
+.hexnet-solo-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.hexnet-solo-empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
+.hexnet-solo-dot {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0.65rem; border-radius: 10px;
+    border: 1px solid var(--border); font-size: 0.8rem;
+    cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.hexnet-solo-dot:hover { transform: translateX(2px); border-color: var(--slot-color, var(--accent)); }
+
+/* Pure-CSS n-ary org chart: each generation is a <ul>, each person a <li>.
+   Connector lines are drawn with ::before/::after so the layout works at
+   any depth or branching factor without manual coordinate math. */
+.hexnet-orgchart, .hexnet-orgchart ul, .hexnet-orgchart li { list-style: none; margin: 0; padding: 0; position: relative; }
+.hexnet-orgchart { display: inline-block; text-align: center; }
+.hexnet-orgchart ul { display: flex; padding-top: 24px; position: relative; }
+.hexnet-orgchart li { display: flex; flex-direction: column; align-items: center; padding: 24px 10px 0; position: relative; }
+.hexnet-orgchart li::before,
+.hexnet-orgchart li::after {
+    content: ""; position: absolute; top: 0; right: 50%;
+    border-top: 2px solid rgba(255,255,255,0.18);
+    width: 50%; height: 24px;
+}
+.hexnet-orgchart li::after { right: auto; left: 50%; border-left: 2px solid rgba(255,255,255,0.18); }
+.hexnet-orgchart li:only-child { padding-top: 0; }
+.hexnet-orgchart li:only-child::before, .hexnet-orgchart li:only-child::after { display: none; }
+.hexnet-orgchart li:first-child::before, .hexnet-orgchart li:last-child::after { border: 0 none; }
+.hexnet-orgchart li:last-child::before { border-right: 2px solid rgba(255,255,255,0.18); border-radius: 0 6px 0 0; }
+.hexnet-orgchart li:first-child::after { border-radius: 6px 0 0 0; }
+.hexnet-orgchart ul ul::before {
+    content: ""; position: absolute; top: 0; left: 50%;
+    border-left: 2px solid rgba(255,255,255,0.18); width: 0; height: 24px;
+}
+.hexnet-tree-node {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.4rem 0.7rem; border-radius: 10px;
+    background: var(--glass-fill); border: 1.5px solid var(--slot-color, rgba(255,255,255,0.2));
+    font-size: 0.78rem; white-space: nowrap; cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.hexnet-tree-node:hover, .hexnet-tree-node:focus-visible {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 8px 18px -6px rgba(0,0,0,0.5), 0 0 0 3px color-mix(in srgb, var(--slot-color, var(--accent)) 30%, transparent);
+    outline: none;
+}
+.hexnet-tree-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--slot-color, var(--accent)); flex: none; }
+.hexnet-tree-name { font-weight: 500; }
+.hexnet-tree-count { font-size: 0.68rem; background: rgba(255,255,255,0.12); border-radius: 6px; padding: 0 0.35rem; color: var(--text-muted); }
+
+@media (max-width: 900px) {
+    .hexnet-forest-layout { grid-template-columns: 1fr; }
+    .hexnet-forest-solo { max-height: 280px; }
+}
+
+/* Focus / drill-down view */
+.hexnet-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; font-size: 0.85rem; color: var(--text-muted); }
+.hexnet-breadcrumb button { background: none; border: none; color: #a5b4fc; padding: 0.15rem 0.4rem; border-radius: 8px; font-size: 0.85rem; }
+.hexnet-breadcrumb button:hover { background: rgba(255,255,255,0.08); }
+.hexnet-breadcrumb .current { color: var(--text-primary); font-weight: 600; padding: 0.15rem 0.4rem; }
+
+.hexnet-focus-wrap { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
+.hexnet-focus-svg-wrap { flex: 1 1 380px; min-width: 280px; }
+.hexnet-detail-panel { flex: 0 0 260px; background: var(--glass-fill); border: 1px solid var(--border); border-radius: 18px; padding: 1.1rem; }
+.hexnet-detail-panel h6 { text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 0.75rem; }
+.hexnet-detail-name { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.4rem; }
+.hexnet-detail-row { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px dashed var(--border); font-size: 0.85rem; }
+.hexnet-detail-row:last-child { border-bottom: none; }
+.hexnet-detail-empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1.5rem 0.5rem; }
+
+/* Search */
+.hexnet-search-wrap { position: relative; }
+.hexnet-search-results { position: absolute; z-index: 20; margin-top: 0.35rem; width: 100%; min-width: 260px; background: linear-gradient(135deg, rgba(30,36,54,0.98), rgba(12,16,26,0.98)); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 16px 34px -10px rgba(0,0,0,0.6); max-height: 280px; overflow-y: auto; }
+.hexnet-search-result { padding: 0.55rem 0.9rem; font-size: 0.85rem; cursor: pointer; display: flex; justify-content: space-between; gap: 0.5rem; }
+.hexnet-search-result:hover, .hexnet-search-result.active { background: rgba(99,102,241,0.18); }
+.hexnet-search-empty { padding: 0.75rem 0.9rem; font-size: 0.8rem; color: var(--text-muted); }
+
+/* Dashboard "My Network" mini widget */
+.hexnet-mini-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem; }
+.hexnet-mini-svg-wrap { flex: 0 0 240px; max-width: 100%; }
+.hexnet-mini-stats { flex: 1 1 200px; display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* Hexagon-sides widget: user's own hexagon, one marker per direct referral
+   sitting on each of the 6 edges */
+.hexnet-hex-sides-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.hexnet-hex-sides-zoom { transition: transform 0.25s ease; transform-origin: center; cursor: pointer; }
+.hexnet-hex-sides-zoom:hover { transform: scale(1.08); }
+.hexnet-sides-svg { width: 100%; max-width: 320px; height: auto; }
+.hexnet-side-dot { stroke: rgba(15,23,42,0.9); stroke-width: 2; transition: transform 0.15s ease, filter 0.15s ease; cursor: pointer; transform-box: fill-box; transform-origin: center; }
+.hexnet-side-marker:hover .hexnet-side-dot, .hexnet-side-marker:focus-visible .hexnet-side-dot { transform: scale(1.25); filter: brightness(1.15); }
+.hexnet-side-dot-empty { fill: rgba(255,255,255,0.06); stroke: rgba(255,255,255,0.25); stroke-dasharray: 3 3; }
+.hexnet-hex-sides-more { font-size: 0.78rem; color: var(--text-muted); }
+.hexnet-hex-sides-progress { font-size: 0.82rem; color: var(--text-primary); text-align: center; }
+
+/* ── 5 levels x 5 hexagons grid — each hexagon is one real person ── */
+.hexnet-levels-grid { display: flex; flex-direction: column; gap: 0.9rem; width: 100%; }
+.hexnet-level-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.hexnet-level-label { flex: 0 0 108px; display: flex; flex-direction: column; line-height: 1.25; }
+.hexnet-level-num { font-weight: 700; font-size: 0.85rem; color: var(--text-primary); }
+.hexnet-level-count { font-size: 0.72rem; color: var(--text-muted); }
+.hexnet-level-pending { font-size: 0.72rem; color: #f59e0b; display: inline-flex; align-items: center; gap: 0.25rem; }
+.hexnet-level-slots { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.hexnet-level-more { font-size: 0.72rem; color: #a5b4fc; align-self: center; white-space: nowrap; }
+
+.hexnet-slot {
+    width: 46px; height: 46px;
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+}
+
+/* Referred (filled) hexagon: highlighted, colored by status, glowing */
+.hexnet-slot-filled {
+    background: linear-gradient(160deg, var(--slot-color), rgba(0,0,0,0.35));
+    box-shadow: 0 0 12px -1px var(--slot-color);
+    cursor: pointer;
+}
+.hexnet-slot-filled:hover,
+.hexnet-slot-filled:focus-visible { transform: scale(1.22); filter: brightness(1.15); outline: none; z-index: 2; position: relative; }
+.hexnet-slot-initials { font-size: 0.78rem; font-weight: 700; color: #0b0f1a; letter-spacing: 0.2px; }
+
+/* Un-referred (empty) hexagon: dull, dim, non-interactive placeholder -
+   still zooms on hover so every hexagon in the grid responds the same way */
+.hexnet-slot-dull {
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px dashed rgba(148, 163, 184, 0.28);
+    opacity: 0.55;
+    cursor: pointer;
+}
+.hexnet-slot-dull:hover,
+.hexnet-slot-dull:focus-visible { transform: scale(1.18); opacity: 0.85; outline: none; z-index: 2; position: relative; }
+.hexnet-slot-plus { font-size: 0.95rem; font-weight: 600; color: var(--text-muted); }
+
+@media (max-width: 576px) {
+    .hexnet-level-row { gap: 0.6rem; }
+    .hexnet-level-label { flex-basis: 100%; flex-direction: row; justify-content: space-between; }
+    .hexnet-slot { width: 40px; height: 40px; }
+}
+
+/* Remaining-count label per level */
+.hexnet-level-remaining { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
+
+/* ── Level progression: active level draws focus, completed settles
+   back to normal, locked levels stay small/dim until reached ── */
+.hexnet-level-badge {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 999px; width: fit-content; margin-top: 2px;
+}
+.hexnet-level-badge-done { color: #10b981; background: rgba(16, 185, 129, 0.12); }
+.hexnet-level-badge-active { color: #0b0f1a; background: #a5b4fc; animation: hexnetPulseBadge 1.8s ease-in-out infinite; }
+.hexnet-level-badge-locked { color: var(--text-muted); background: rgba(148, 163, 184, 0.1); }
+@keyframes hexnetPulseBadge { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+.hexnet-level-active .hexnet-slot { width: 58px; height: 58px; }
+.hexnet-level-active .hexnet-slot-filled { box-shadow: 0 0 20px -1px var(--slot-color); }
+.hexnet-level-active .hexnet-slot-initials { font-size: 0.9rem; }
+.hexnet-level-active .hexnet-slot-dull { border-color: rgba(165, 180, 252, 0.55); opacity: 0.8; animation: hexnetGlowInvite 2.2s ease-in-out infinite; }
+@keyframes hexnetGlowInvite { 0%, 100% { box-shadow: 0 0 0 rgba(165, 180, 252, 0); } 50% { box-shadow: 0 0 10px rgba(165, 180, 252, 0.35); } }
+
+.hexnet-level-completed .hexnet-slot { width: 46px; height: 46px; }
+
+.hexnet-level-locked .hexnet-slot { width: 34px; height: 34px; }
+.hexnet-level-locked .hexnet-slot-initials { font-size: 0.62rem; }
+.hexnet-level-locked .hexnet-slot-plus { font-size: 0.78rem; }
+.hexnet-level-locked { opacity: 0.6; }
+
+.hexnet-slot-add { cursor: pointer; }
+.hexnet-slot-add:hover, .hexnet-slot-add:focus-visible { opacity: 1; transform: scale(1.1); outline: none; border-color: rgba(165, 180, 252, 0.7); }
+
+/* ── Referral-link popup shown beside a clicked empty hexagon ── */
+.hexnet-ref-popup {
+    position: absolute; z-index: 1080; width: 280px;
+    background: #151a2b; border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 12px; padding: 0.85rem 0.9rem;
+    box-shadow: 0 12px 32px -6px rgba(0,0,0,0.55);
+    animation: hexnetPopupIn 0.15s ease-out;
+}
+@keyframes hexnetPopupIn { from { opacity: 0; transform: translateY(-4px) scale(0.97); } to { opacity: 1; transform: none; } }
+.hexnet-ref-popup-title { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.3rem; }
+.hexnet-ref-popup-copied { font-size: 0.7rem; color: #10b981; margin-bottom: 0.5rem; }
+.hexnet-ref-popup-row { display: flex; gap: 0.4rem; }
+.hexnet-ref-popup-row input {
+    flex: 1; min-width: 0; background: rgba(148, 163, 184, 0.08); border: 1px solid rgba(148, 163, 184, 0.2);
+    color: var(--text-primary); font-size: 0.72rem; border-radius: 6px; padding: 0.35rem 0.5rem;
+}
+.hexnet-ref-popup-copy {
+    flex: 0 0 auto; border: 1px solid rgba(148, 163, 184, 0.2); background: rgba(165, 180, 252, 0.12);
+    color: #a5b4fc; border-radius: 6px; padding: 0.35rem 0.55rem; cursor: pointer;
+}
+.hexnet-ref-popup-copy:hover { background: rgba(165, 180, 252, 0.22); }
+.hexnet-ref-popup-hint { font-size: 0.66rem; color: var(--text-muted); margin-top: 0.45rem; line-height: 1.35; }
+
+@media (max-width: 768px) {
+    .hexnet-focus-wrap { flex-direction: column; }
+    .hexnet-detail-panel { flex-basis: auto; width: 100%; }
+    .hexnet-forest-layout { grid-template-columns: 1fr; }
+    .hexnet-mini-svg-wrap { flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hexnet-dot-ring, .hexnet-live-dot { animation: none; }
+    .hexnet-node:hover .hexnet-hexagon { transform: none; }
+}
+
+/* Compose-email modal (read-only fields that are still meant to be selected/copied) */
+.compose-field[readonly] { cursor: text; opacity: 0.92; }
+

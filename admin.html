@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block extra_css %}
+<style>
+.stat-pill { background: linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95)); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 1.25rem; transition: transform 0.2s ease, border-color 0.2s ease; }
+.stat-pill:hover { transform: translateY(-3px); border-color: rgba(99,102,241,0.3); }
+.user-card { background: rgba(30,41,59,0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 1rem; transition: all 0.2s ease; }
+.user-card:hover { border-color: rgba(99,102,241,0.35); transform: translateY(-2px); box-shadow: 0 12px 24px -12px rgba(99,102,241,0.25); }
+.status-pending { border-left: 3px solid #f59e0b; }
+.status-approved { border-left: 3px solid #10b981; }
+.status-rejected { border-left: 3px solid #ef4444; }
+.avatar-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: transform 0.2s ease; }
+.user-card:hover .avatar-circle { transform: scale(1.1); }
+</style>
+{% endblock %}
+{% block content %}
+<nav class="navbar navbar-expand-lg admin-nav sticky-top">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="#"><i class="bi bi-shield-shaded text-danger"></i> Admin Panel</a>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small"><i class="bi bi-person"></i> {{ session.full_name }}</span>
+            <a href="{{ url_for('admin_network') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-hexagon"></i> Network</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">User View</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+    <h3 class="fw-bold mb-4">Dashboard Overview</h3>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="stat-pill text-center">
+                <div class="fs-3 fw-bold text-warning">{{ stats.pending_count }}</div>
+                <div class="text-muted small">Pending Users</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="stat-pill text-center">
+                <div class="fs-3 fw-bold text-success">{{ stats.approved_count }}</div>
+                <div class="text-muted small">Approved</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="stat-pill text-center">
+                <div class="fs-3 fw-bold text-danger">{{ stats.rejected_count }}</div>
+                <div class="text-muted small">Rejected</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="stat-pill text-center">
+                <div class="fs-3 fw-bold text-info">{{ stats.reset_count }}</div>
+                <div class="text-muted small">Pwd Requests</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="stat-pill text-center">
+                <div class="fs-3 fw-bold text-primary">{{ stats.today_count }}</div>
+                <div class="text-muted small">Today</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <div class="stat-pill text-center">
+                <div class="fs-3 fw-bold text-success">{{ format_currency(stats.total_earnings) }}</div>
+                <div class="text-muted small">Total Earnings</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-clock-history text-warning"></i> Pending Approvals</h5>
+                    <span class="badge bg-warning">{{ pending_users|length }}</span>
+                </div>
+                <div class="card-body">
+                    {% if pending_users %}
+                    <div class="row g-3">
+                        {% for u in pending_users %}
+                        <div class="col-md-6">
+                            <div class="user-card status-pending">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="avatar-circle bg-warning bg-opacity-20 text-warning">{{ u.full_name[0]|upper }}</div>
+                                        <div>
+                                            <div class="fw-bold">{{ u.full_name }}</div>
+                                            <div class="text-muted small font-monospace d-flex align-items-center gap-1">
+                                                {{ u.public_user_id }}
+                                                <button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy ID" onclick="copyToClipboard('{{ u.public_user_id }}')"><i class="bi bi-clipboard"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                </div>
+                                <div class="small text-muted mb-2">
+                                    <div><i class="bi bi-envelope"></i> {{ u.email }}</div>
+                                    <div><i class="bi bi-telephone"></i> {{ u.phone or 'N/A' }}</div>
+                                    <div><i class="bi bi-geo-alt"></i> {{ u.address or 'N/A' }}</div>
+                                    {% if u.referral_id %}<div><i class="bi bi-arrow-up-circle"></i> Referred by: {{ u.referral_id }}</div>{% endif %}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <form method="POST" action="{{ url_for('approve_user', user_id=u.id) }}" class="flex-fill">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-success btn-sm w-100"><i class="bi bi-check-lg"></i> Approve</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('reject_user', user_id=u.id) }}" class="flex-fill">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-x-lg"></i> Reject</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p>No pending users.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-people text-success"></i> Approved Users</h5>
+                    <span class="badge bg-success">Last 20</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead><tr><th>ID</th><th>Name</th><th>Level</th><th>Referrals</th><th>Earned</th><th>Joined</th></tr></thead>
+                            <tbody>
+                                {% for u in approved_users %}
+                                <tr>
+                                    <td class="font-monospace small">
+                                        <span class="d-flex align-items-center gap-1">
+                                            {{ u.public_user_id }}
+                                            <button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy ID" onclick="copyToClipboard('{{ u.public_user_id }}')"><i class="bi bi-clipboard"></i></button>
+                                        </span>
+                                    </td>
+                                    <td>{{ u.full_name }}</td>
+                                    <td><span class="badge bg-secondary">{{ u.user_level }}</span></td>
+                                    <td>{{ u.referral_count }}</td>
+                                    <td class="text-success">{{ format_currency(u.amount_earned) }}</td>
+                                    <td class="text-muted small">{{ u.created_at.strftime('%d %b') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-header border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-key text-info"></i> Password Reset Requests</h5>
+                </div>
+                <div class="card-body">
+                    {% if reset_requests %}
+                    <div class="vstack gap-3">
+                        {% for req in reset_requests %}
+                        <div class="user-card">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="fw-bold">{{ req.full_name }}</div>
+                                    <div class="text-muted small">{{ req.username }}</div>
+                                    <div class="text-muted small">{{ req.email }}</div>
+                                </div>
+                                <span class="badge bg-info">Pending</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <form method="POST" action="{{ url_for('approve_reset', request_id=req.id) }}" class="flex-fill">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-check-lg"></i> Approve</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('reject_reset', request_id=req.id) }}" class="flex-fill">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-x-lg"></i> Reject</button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p>No password reset requests.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-header border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-clock-history text-secondary"></i> Password Reset History</h5>
+                </div>
+                <div class="card-body" style="max-height: 420px; overflow-y: auto;">
+                    {% if reset_history %}
+                    <div class="vstack gap-2">
+                        {% for req in reset_history %}
+                        <div class="user-card {{ 'status-approved' if req.status == 'approved' else 'status-rejected' }}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-bold">{{ req.full_name }}</div>
+                                    <div class="text-muted small">{{ req.username }} &middot; {{ req.email }}</div>
+                                    <div class="text-muted small">
+                                        Requested {{ req.requested_at.strftime('%d %b %Y, %I:%M %p') if req.requested_at else '-' }}
+                                        {% if req.resolved_at %}
+                                            &middot; Resolved {{ req.resolved_at.strftime('%d %b %Y, %I:%M %p') }}
+                                        {% endif %}
+                                        {% if req.resolved_by_name %}
+                                            by {{ req.resolved_by_name }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <span class="badge {{ 'bg-success' if req.status == 'approved' else 'bg-danger' }}">{{ req.status|capitalize }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-hourglass fs-1"></i>
+                        <p>No resolved reset requests yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if compose_email %}
+<div class="modal fade" id="composeEmailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title"><i class="bi bi-envelope-paper text-primary"></i> Reset Email Ready to Send</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">The reset link was generated but <strong>not sent automatically</strong>. Review it below, then send it however you'd like.</p>
+
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small text-muted mb-0" for="composeTo">To</label>
+            <button class="btn btn-sm btn-outline-light py-0 px-2" type="button" data-copy="#composeTo"><i class="bi bi-clipboard"></i> Copy</button>
+          </div>
+          <input type="text" class="form-control compose-field" id="composeTo" value="{{ compose_email.to }}" readonly>
+        </div>
+
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small text-muted mb-0" for="composeSubject">Subject</label>
+            <button class="btn btn-sm btn-outline-light py-0 px-2" type="button" data-copy="#composeSubject"><i class="bi bi-clipboard"></i> Copy</button>
+          </div>
+          <input type="text" class="form-control compose-field" id="composeSubject" value="{{ compose_email.subject }}" readonly>
+        </div>
+
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small text-muted mb-0" for="composeBody">Body</label>
+            <button class="btn btn-sm btn-outline-light py-0 px-2" type="button" data-copy="#composeBody"><i class="bi bi-clipboard"></i> Copy</button>
+          </div>
+          <textarea class="form-control compose-field" id="composeBody" rows="6" readonly>{{ compose_email.body }}</textarea>
+        </div>
+
+        <div>
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label small text-muted mb-0" for="composeLink">Reset link only</label>
+            <button class="btn btn-sm btn-outline-light py-0 px-2" type="button" data-copy="#composeLink"><i class="bi bi-clipboard"></i> Copy</button>
+          </div>
+          <input type="text" class="form-control compose-field" id="composeLink" value="{{ compose_email.reset_link }}" readonly>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+        <a id="composeMailto" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-glow"><i class="bi bi-box-arrow-up-right"></i> Open in Gmail (new tab)</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if compose_email %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var modalEl = document.getElementById('composeEmailModal');
+    if (!modalEl) return;
+    new bootstrap.Modal(modalEl).show();
+
+    var to = {{ compose_email.to|tojson }};
+    var subject = {{ compose_email.subject|tojson }};
+    var body = {{ compose_email.body|tojson }};
+    var mailtoLink = document.getElementById('composeMailto');
+    if (mailtoLink) {
+        // Open Gmail's web compose view in a new browser tab instead of
+        // handing off to whatever mail app is registered on the device -
+        // mailto: links trigger that app-switch even with target="_blank",
+        // so we build the Gmail web-compose URL directly.
+        mailtoLink.href = 'https://mail.google.com/mail/?view=cm&fs=1' +
+            '&to=' + encodeURIComponent(to) +
+            '&su=' + encodeURIComponent(subject) +
+            '&body=' + encodeURIComponent(body);
+    }
+
+    document.querySelectorAll('[data-copy]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var target = document.querySelector(btn.getAttribute('data-copy'));
+            if (!target) return;
+            var finish = function (label) {
+                var original = btn.innerHTML;
+                btn.innerHTML = '<i class="bi bi-check-lg"></i> ' + label;
+                setTimeout(function () { btn.innerHTML = original; }, 1500);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(target.value).then(function () { finish('Copied'); })
+                    .catch(function () { target.select(); finish('Selected'); });
+            } else {
+                target.select();
+                finish('Selected');
+            }
+        });
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

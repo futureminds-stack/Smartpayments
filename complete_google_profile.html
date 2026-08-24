@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Complete Profile{% endblock %}
+{% block content %}
+<div class="auth-page">
+    <div class="auth-glass" style="max-width: 500px;">
+        <div class="text-center mb-4">
+            <div class="auth-logo"><i class="bi bi-google"></i></div>
+            <h2 class="fw-bold">Complete Your Profile</h2>
+            <p class="text-muted">Google: {{ email }}</p>
+        </div>
+        <form method="POST" action="{{ url_for('complete_google_profile') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="full_name" class="form-control" value="{{ name }}" placeholder="Your full name" required>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" name="phone" class="form-control" placeholder="+1 234 567 890">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Referral ID <small class="text-muted">(optional, from invite link)</small></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                        <input type="text" name="referral_id" class="form-control" placeholder="No referral code" value="{{ ref_code }}" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label d-flex justify-content-between">
+                    <span>Address</span>
+                    <span class="text-muted small" id="addressCount">0/80</span>
+                </label>
+                <textarea name="address" id="addressField" class="form-control" rows="2" maxlength="80" placeholder="Your address"></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" placeholder="Choose a username" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <input type="password" name="password" class="form-control password-field" placeholder="Min 8 characters, incl. a letter &amp; number" required>
+                    <button type="button" class="btn btn-outline-secondary toggle-password"><i class="bi bi-eye"></i></button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Confirm Password</label>
+                <div class="input-group">
+                    <input type="password" name="confirm_password" class="form-control password-field" placeholder="Confirm password" required>
+                    <button type="button" class="btn btn-outline-secondary toggle-password"><i class="bi bi-eye"></i></button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 btn-glow">Complete Registration</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    const field = document.getElementById("addressField");
+    const count = document.getElementById("addressCount");
+    if (!field || !count) return;
+    const update = () => {
+        count.textContent = field.value.length + "/80";
+        count.classList.toggle("text-warning", field.value.length >= 70);
+    };
+    field.addEventListener("input", update);
+    update();
+})();
+</script>
+{% endblock %}
