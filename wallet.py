@@ -112,6 +112,29 @@ def get_all_transactions(limit=100):
     return list(cursor)
 
 
+def credit_wallet(referral_id, amount, reason=None, full_name=None):
+    """Add money to a wallet directly (no sender) — used for rewards like
+    the referral bonus. Creates the wallet with the starting balance first
+    if it doesn't exist yet, then adds `amount` on top."""
+    if amount <= 0:
+        raise WalletError("Amount must be greater than zero.")
+    db = _get_db()
+    init_wallet(referral_id, full_name=full_name)
+    db.wallets.update_one({"referral_id": referral_id}, {"$inc": {"balance": amount}})
+    db.transactions.insert_one(
+        {
+            "txn_id": uuid.uuid4().hex[:12].upper(),
+            "from_id": "SYSTEM",
+            "from_name": reason or "Reward",
+            "to_id": referral_id,
+            "to_name": full_name,
+            "amount": amount,
+            "created_at": time.time(),
+        }
+    )
+    return get_wallet(referral_id)
+
+
 def transfer(from_id, to_id, amount, from_name=None, to_name=None):
     """Move `amount` from from_id's wallet to to_id's wallet atomically.
     Raises WalletError for any user-facing validation failure."""
