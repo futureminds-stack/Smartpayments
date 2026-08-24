@@ -1063,12 +1063,25 @@ def admin_dashboard():
             """)
             reset_history = cur.fetchall()
 
+            try:
+                payment_history = wallet.get_all_transactions(limit=100)
+                for t in payment_history:
+                    ts = t.get("created_at")
+                    t["created_at_display"] = (
+                        datetime.fromtimestamp(ts).strftime("%d %b %Y, %I:%M %p") if ts else "-"
+                    )
+            except Exception as e:
+                logger.error(f"Admin payment history load error: {e}")
+                payment_history = []
+
             return render_template("admin.html",
                                    stats=stats,
                                    pending_users=pending_users,
                                    approved_users=approved_users,
                                    reset_requests=reset_requests,
                                    reset_history=reset_history,
+                                   payment_history=payment_history,
+                                   wallet_enabled=wallet.wallet_enabled(),
                                    compose_email=session.pop("pending_compose_email", None))
     except Exception as e:
         logger.error(f"Admin dashboard error: {e}")
