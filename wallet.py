@@ -104,6 +104,14 @@ def get_transactions(referral_id, limit=20):
     return list(cursor)
 
 
+def get_all_transactions(limit=100):
+    """Every wallet transfer platform-wide, most recent first — for the
+    admin panel's payment history view."""
+    db = _get_db()
+    cursor = db.transactions.find({}, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return list(cursor)
+
+
 def transfer(from_id, to_id, amount, from_name=None, to_name=None):
     """Move `amount` from from_id's wallet to to_id's wallet atomically.
     Raises WalletError for any user-facing validation failure."""
