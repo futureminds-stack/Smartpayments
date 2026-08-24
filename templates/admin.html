@@ -231,6 +231,57 @@
                     {% endif %}
                 </div>
             </div>
+
+            <div class="card bg-dark border-secondary mb-4">
+                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-cash-stack text-success"></i> Payment History</h5>
+                    <span class="text-muted small">Wallet-to-wallet transfers</span>
+                </div>
+                <div class="card-body" style="max-height: 420px; overflow-y: auto;">
+                    {% if not wallet_enabled %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-wallet2 fs-1"></i>
+                        <p class="mb-0">Wallet is not configured (MONGODB_URI not set) — no payment data to show yet.</p>
+                    </div>
+                    {% elif payment_history %}
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Txn ID</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Amount</th>
+                                    <th>When</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for t in payment_history %}
+                                <tr>
+                                    <td class="font-monospace small">{{ t.txn_id }}</td>
+                                    <td>
+                                        <div>{{ t.from_name or '—' }}</div>
+                                        <div class="text-muted small font-monospace">{{ t.from_id }}</div>
+                                    </td>
+                                    <td>
+                                        <div>{{ t.to_name or '—' }}</div>
+                                        <div class="text-muted small font-monospace">{{ t.to_id }}</div>
+                                    </td>
+                                    <td class="text-success fw-bold">₹{{ "%.2f"|format(t.amount) }}</td>
+                                    <td class="text-muted small">{{ t.created_at_display }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-cash fs-1"></i>
+                        <p class="mb-0">No wallet transfers yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
