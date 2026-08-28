@@ -31,6 +31,7 @@
                     <i class="bi bi-person-circle"></i> {{ session.full_name }}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{{ url_for('edit_profile') }}"><i class="bi bi-person-gear"></i> Edit Profile</a></li>
                     <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
                 </ul>
             </div>
@@ -70,9 +71,9 @@
                 <div class="d-flex align-items-center gap-3 mb-2">
                     <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-hash"></i></div>
                 </div>
-                <div class="text-muted small">My ID</div>
-                <div class="font-monospace fw-bold text-truncate" id="internal-id">{{ user.id }}</div>
-                <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyToClipboard('{{ user.id }}')">
+                <div class="text-muted small">Your Wallet ID</div>
+                <div class="font-monospace fw-bold text-truncate" id="wallet-id" style="font-size: 0.85rem;">{{ wallet_id_display }}</div>
+                <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyToClipboard('{{ wallet_id_display }}')">
                     <i class="bi bi-clipboard"></i> Copy
                 </button>
             </div>
