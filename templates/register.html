@@ -27,7 +27,8 @@
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Phone</label>
-                    <input type="tel" name="phone" class="form-control" placeholder="+1 234 567 890">
+                    <input type="tel" name="phone" id="phoneField" class="form-control" inputmode="numeric"
+                           maxlength="10" pattern="[0-9]{10}" placeholder="10-digit mobile number" required>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Referral ID <small class="text-muted">(optional, from invite link)</small></label>
@@ -37,13 +38,7 @@
                     </div>
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label d-flex justify-content-between">
-                    <span>Address</span>
-                    <span class="text-muted small" id="addressCount">0/80</span>
-                </label>
-                <textarea name="address" id="addressField" class="form-control" rows="2" maxlength="80" placeholder="Your address"></textarea>
-            </div>
+            {% include "_address_fields.html" with context %}
             <div class="mb-3">
                 <label class="form-label">Password</label>
                 <div class="input-group">
@@ -69,15 +64,10 @@
 {% block extra_js %}
 <script>
 (function () {
-    const field = document.getElementById("addressField");
-    const count = document.getElementById("addressCount");
-    if (!field || !count) return;
-    const update = () => {
-        count.textContent = field.value.length + "/80";
-        count.classList.toggle("text-warning", field.value.length >= 70);
-    };
-    field.addEventListener("input", update);
-    update();
+    const phone = document.getElementById("phoneField");
+    if (phone) phone.addEventListener("input", () => {
+        phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
+    });
 })();
 </script>
 {% endblock %}
