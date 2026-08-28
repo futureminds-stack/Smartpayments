@@ -252,6 +252,41 @@ def generate_public_id():
     """Unique 16-digit numeric code, used as the account's Referral ID."""
     return "".join(secrets.choice("0123456789") for _ in range(16))
 
+def validate_phone(phone):
+    """Exactly 10 digits, like a standard Indian mobile number."""
+    phone = (phone or "").strip()
+    if not re.match(r"^\d{10}$", phone):
+        return None, "Phone number must be exactly 10 digits."
+    return phone, None
+
+def validate_pincode(pincode):
+    pincode = (pincode or "").strip()
+    if pincode and not re.match(r"^\d{6}$", pincode):
+        return None, "Pincode must be 6 digits."
+    return pincode, None
+
+def build_address_fields(form):
+    """Read the structured address fields from a submitted form and
+    return (parts_dict, formatted_string, errors)."""
+    door_no = form.get("door_no", "").strip()
+    mandal = form.get("mandal", "").strip()
+    district = form.get("district", "").strip()
+    state = form.get("state", "").strip()
+    pincode, pin_err = validate_pincode(form.get("pincode", ""))
+
+    errors = []
+    if pin_err:
+        errors.append(pin_err)
+    for label, val, maxlen in (("Door number", door_no, 50), ("Mandal", mandal, 100),
+                                ("District", district, 100), ("State", state, 100)):
+        if len(val) > maxlen:
+            errors.append(f"{label} must be {maxlen} characters or fewer.")
+
+    parts = {"door_no": door_no, "mandal": mandal, "district": district,
+              "state": state, "pincode": pincode or ""}
+    formatted = ", ".join(p for p in [door_no, mandal, district, state, pincode] if p)
+    return parts, formatted, errors
+
 def get_level(ref_count):
     if ref_count >= 50: return "Legend"
     elif ref_count >= 25: return "Diamond"
@@ -408,8 +443,8 @@ def register():
     if request.method == "POST":
         full_name = request.form.get("full_name", "").strip()
         email = request.form.get("email", "").strip().lower()
-        phone = request.form.get("phone", "").strip()
-        address = request.form.get("address", "").strip()
+        phone, phone_err = validate_phone(request.form.get("phone", ""))
+        addr_parts, address, addr_errors = build_address_fields(request.form)
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
@@ -420,8 +455,9 @@ def register():
             errors.append("Full name is required (min 2 chars).")
         if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
             errors.append("Valid email is required.")
-        if len(address) > 80:
-            errors.append("Address must be 80 characters or fewer.")
+        if phone_err:
+            errors.append(phone_err)
+        errors.extend(addr_errors)
         if not username or len(username) < 3:
             errors.append("Username must be at least 3 characters.")
         errors.extend(password_errors(password))
@@ -460,10 +496,14 @@ def register():
                 password_hash = generate_password_hash(password)
                 cur.execute("""
                     INSERT INTO users 
-                    (public_user_id, full_name, email, phone, address, username, password_hash, referral_id, status, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
+                    (public_user_id, full_name, email, phone, address, door_no, mandal, district, state, pincode,
+                     username, password_hash, referral_id, status, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
                     RETURNING id, public_user_id
-                """, (public_id, full_name, email, phone, address, username, password_hash, referrer_id))
+                """, (public_id, full_name, email, phone, address,
+                      addr_parts["door_no"], addr_parts["mandal"], addr_parts["district"],
+                      addr_parts["state"], addr_parts["pincode"],
+                      username, password_hash, referrer_id))
                 new_user = cur.fetchone()
 
                 if referrer_id:
@@ -530,8 +570,8 @@ def complete_google_profile():
 
     if request.method == "POST":
         full_name = request.form.get("full_name", "").strip()
-        phone = request.form.get("phone", "").strip()
-        address = request.form.get("address", "").strip()
+        phone, phone_err = validate_phone(request.form.get("phone", ""))
+        addr_parts, address, addr_errors = build_address_fields(request.form)
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
@@ -540,8 +580,9 @@ def complete_google_profile():
         errors = []
         if not full_name:
             errors.append("Full name is required.")
-        if len(address) > 80:
-            errors.append("Address must be 80 characters or fewer.")
+        if phone_err:
+            errors.append(phone_err)
+        errors.extend(addr_errors)
         if not username or len(username) < 3:
             errors.append("Username must be at least 3 characters.")
         errors.extend(password_errors(password))
@@ -585,11 +626,13 @@ def complete_google_profile():
                 password_hash = generate_password_hash(password)
                 cur.execute("""
                     INSERT INTO users 
-                    (public_user_id, full_name, email, phone, address, username, password_hash,
-                     google_id, referral_id, status, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
+                    (public_user_id, full_name, email, phone, address, door_no, mandal, district, state, pincode,
+                     username, password_hash, google_id, referral_id, status, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
                     RETURNING id, public_user_id
                 """, (public_id, full_name, session["google_email"], phone, address,
+                      addr_parts["door_no"], addr_parts["mandal"], addr_parts["district"],
+                      addr_parts["state"], addr_parts["pincode"],
                       username, password_hash, session.get("google_id"), referrer_id))
                 new_user = cur.fetchone()
 
@@ -764,11 +807,69 @@ def dashboard():
                                    ref_link=ref_link,
                                    wallet=my_wallet,
                                    wallet_txns=wallet_txns,
+                                   wallet_id_display=wallet.wallet_address(user["public_user_id"]),
                                    wallet_enabled=wallet.wallet_enabled())
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
         flash("Error loading dashboard.", "danger")
         return redirect(url_for("login"))
+    finally:
+        release_db(conn)
+
+# ═════════════════════════════════════════════════════════════
+# EDIT PROFILE (saves straight to the database on submit - no
+# separate admin approval step; that only gates new registrations)
+# ═════════════════════════════════════════════════════════════
+@app.route("/profile/edit", methods=["GET", "POST"])
+def edit_profile():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if request.method == "POST":
+                full_name = request.form.get("full_name", "").strip()
+                phone, phone_err = validate_phone(request.form.get("phone", ""))
+                addr_parts, address, addr_errors = build_address_fields(request.form)
+
+                errors = []
+                if not full_name or len(full_name) < 2:
+                    errors.append("Full name is required (min 2 chars).")
+                if phone_err:
+                    errors.append(phone_err)
+                errors.extend(addr_errors)
+
+                if errors:
+                    for e in errors:
+                        flash(e, "danger")
+                    return redirect(url_for("edit_profile"))
+
+                cur.execute("""
+                    UPDATE users
+                    SET full_name = %s, phone = %s, address = %s,
+                        door_no = %s, mandal = %s, district = %s, state = %s, pincode = %s
+                    WHERE id = %s
+                """, (full_name, phone, address,
+                      addr_parts["door_no"], addr_parts["mandal"], addr_parts["district"],
+                      addr_parts["state"], addr_parts["pincode"],
+                      session["user_id"]))
+                conn.commit()
+                session["full_name"] = full_name
+                flash("Profile updated and saved.", "success")
+                return redirect(url_for("dashboard"))
+
+            cur.execute("SELECT * FROM users WHERE id = %s", (session["user_id"],))
+            user = cur.fetchone()
+            if not user:
+                session.clear()
+                return redirect(url_for("login"))
+            return render_template("edit_profile.html", user=user)
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Edit profile error: {e}")
+        flash("Could not update profile. Please try again.", "danger")
+        return redirect(url_for("dashboard"))
     finally:
         release_db(conn)
 
@@ -1063,25 +1164,12 @@ def admin_dashboard():
             """)
             reset_history = cur.fetchall()
 
-            try:
-                payment_history = wallet.get_all_transactions(limit=100)
-                for t in payment_history:
-                    ts = t.get("created_at")
-                    t["created_at_display"] = (
-                        datetime.fromtimestamp(ts).strftime("%d %b %Y, %I:%M %p") if ts else "-"
-                    )
-            except Exception as e:
-                logger.error(f"Admin payment history load error: {e}")
-                payment_history = []
-
             return render_template("admin.html",
                                    stats=stats,
                                    pending_users=pending_users,
                                    approved_users=approved_users,
                                    reset_requests=reset_requests,
                                    reset_history=reset_history,
-                                   payment_history=payment_history,
-                                   wallet_enabled=wallet.wallet_enabled(),
                                    compose_email=session.pop("pending_compose_email", None))
     except Exception as e:
         logger.error(f"Admin dashboard error: {e}")
@@ -1342,6 +1430,59 @@ def _build_forest(cur, root_rows, max_depth=5):
                 next_ids.append(kid["id"])
         current_ids = next_ids
     return forest
+
+@app.route("/admin/wallets")
+@admin_required
+def admin_wallets():
+    """Dedicated page listing every account's Wallet ID/address (copyable)
+    plus every wallet-to-wallet transaction platform-wide."""
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT public_user_id, full_name, email, status
+                FROM users
+                WHERE status = 'approved'
+                ORDER BY full_name ASC
+            """)
+            users = cur.fetchall()
+
+        wallets_view = []
+        for u in users:
+            try:
+                w = wallet.get_wallet(u["public_user_id"])
+            except Exception as e:
+                logger.error(f"admin_wallets: could not load wallet for {u['public_user_id']}: {e}")
+                w = None
+            wallets_view.append({
+                "full_name": u["full_name"],
+                "email": u["email"],
+                "referral_id": u["public_user_id"],
+                "wallet_address": wallet.wallet_address(u["public_user_id"]),
+                "balance": w["balance"] if w else None,
+            })
+
+        try:
+            payment_history = wallet.get_all_transactions(limit=200)
+            for t in payment_history:
+                ts = t.get("created_at")
+                t["created_at_display"] = (
+                    datetime.fromtimestamp(ts).strftime("%d %b %Y, %I:%M %p") if ts else "-"
+                )
+        except Exception as e:
+            logger.error(f"admin_wallets: payment history load error: {e}")
+            payment_history = []
+
+        return render_template("admin_wallets.html",
+                               wallets_view=wallets_view,
+                               payment_history=payment_history,
+                               wallet_enabled=wallet.wallet_enabled())
+    except Exception as e:
+        logger.error(f"Admin wallets page error: {e}")
+        flash("Could not load wallets page.", "danger")
+        return redirect(url_for("admin_dashboard"))
+    finally:
+        release_db(conn)
 
 @app.route("/admin/network")
 @admin_required
