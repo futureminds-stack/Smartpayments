@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Edit Profile{% endblock %}
+{% block content %}
+<nav class="navbar navbar-expand-lg admin-nav sticky-top">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}"><i class="bi bi-hexagon-fill text-primary"></i> ReferralPro</a>
+        <div class="d-flex align-items-center gap-3">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4" style="max-width: 640px;">
+    <h3 class="fw-bold mb-1"><i class="bi bi-person-gear"></i> Edit Profile</h3>
+    <p class="text-muted small mb-4">Changes save straight to your account when you submit — no need to wait for approval.</p>
+
+    <div class="card bg-dark border-secondary">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('edit_profile') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="full_name" class="form-control" value="{{ user.full_name }}" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" value="{{ user.email }}" disabled>
+                    <div class="form-text">Email can't be changed here — contact support if you need it updated.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" name="phone" id="phoneField" class="form-control" inputmode="numeric"
+                           maxlength="10" pattern="[0-9]{10}" value="{{ user.phone or '' }}"
+                           placeholder="10-digit mobile number" required>
+                </div>
+
+                {% set prefill = user %}
+                {% include "_address_fields.html" with context %}
+
+                <button type="submit" class="btn btn-primary w-100 btn-glow mt-2">
+                    <i class="bi bi-check-circle"></i> Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    const phone = document.getElementById("phoneField");
+    if (phone) phone.addEventListener("input", () => {
+        phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
+    });
+})();
+</script>
+{% endblock %}
