@@ -23,6 +23,7 @@ two databases stay fully decoupled.
 import os
 import time
 import uuid
+import hashlib
 import logging
 
 from pymongo import MongoClient, ReturnDocument
@@ -32,6 +33,17 @@ logger = logging.getLogger(__name__)
 
 MONGODB_URI = os.environ.get("MONGODB_URI")
 INITIAL_BALANCE = 100.0
+
+
+def wallet_address(referral_id):
+    """Deterministic, crypto-exchange-style display address derived from
+    the account's Referral ID (e.g. '0x9F3A1C...'). Purely cosmetic - the
+    Referral ID itself is still what's actually stored and used for
+    transfers under the hood, this just formats it the way people
+    recognize from Binance/MetaMask/etc. Same input always produces the
+    same output, so it never needs to be stored anywhere."""
+    digest = hashlib.sha256(f"referralpro-wallet-{referral_id}".encode()).hexdigest()
+    return "0x" + digest[:40].upper()
 
 _client = None
 _db = None
