@@ -1,0 +1,91 @@
+{# Reusable structured address fields. Include with:
+   {% include "_address_fields.html" with context %}
+   Optionally pass `prefill` (a dict with door_no/mandal/district/state/pincode)
+   to pre-populate an edit form. #}
+<div class="mb-3">
+    <label class="form-label">Wallet ID</label>
+    {% if prefill and prefill.public_user_id %}
+    <div class="alert alert-secondary py-2 px-3 mb-0 small d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-wallet2"></i> <span class="font-monospace">{{ prefill.public_user_id }}</span></span>
+        <button type="button" class="btn btn-sm btn-outline-light" onclick="copyToClipboard('{{ prefill.public_user_id }}')"><i class="bi bi-clipboard"></i> Copy</button>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary py-2 px-3 mb-0 small">
+        <i class="bi bi-wallet2"></i>
+        A unique Wallet ID (your Referral ID) is generated automatically once you register — you'll see it and can copy it from your dashboard.
+    </div>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-3">
+        <label class="form-label">State</label>
+        <select name="state" id="stateField" class="form-select" required>
+            <option value="" disabled {{ "selected" if not (prefill and prefill.state) else "" }}>Select state</option>
+        </select>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label class="form-label">District</label>
+        <select name="district" id="districtField" class="form-select" required>
+            <option value="" disabled selected>Select state first</option>
+        </select>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <label class="form-label">Mandal / Taluk</label>
+        <input type="text" name="mandal" id="mandalField" class="form-control" maxlength="100"
+               placeholder="e.g. Tadepalligudem" value="{{ prefill.mandal if prefill else '' }}" required>
+    </div>
+    <div class="col-md-4 mb-3">
+        <label class="form-label">Pincode</label>
+        <input type="text" name="pincode" id="pincodeField" class="form-control" inputmode="numeric"
+               maxlength="6" pattern="[0-9]{6}" placeholder="6-digit pincode"
+               value="{{ prefill.pincode if prefill else '' }}" required>
+    </div>
+    <div class="col-md-4 mb-3">
+        <label class="form-label">Door Number</label>
+        <input type="text" name="door_no" id="doorNoField" class="form-control" maxlength="50"
+               placeholder="e.g. 12-3-45" value="{{ prefill.door_no if prefill else '' }}" required>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/india_locations.js') }}"></script>
+<script>
+(function () {
+    const stateSel = document.getElementById("stateField");
+    const districtSel = document.getElementById("districtField");
+    if (!stateSel || !districtSel || typeof INDIA_LOCATIONS === "undefined") return;
+
+    const prefillState = {{ (prefill.state if prefill else "") | tojson }};
+    const prefillDistrict = {{ (prefill.district if prefill else "") | tojson }};
+
+    Object.keys(INDIA_LOCATIONS).sort().forEach((state) => {
+        const opt = document.createElement("option");
+        opt.value = state;
+        opt.textContent = state;
+        if (state === prefillState) opt.selected = true;
+        stateSel.appendChild(opt);
+    });
+
+    function populateDistricts(state, selectedDistrict) {
+        districtSel.innerHTML = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.disabled = true;
+        placeholder.textContent = state ? "Select district" : "Select state first";
+        placeholder.selected = !selectedDistrict;
+        districtSel.appendChild(placeholder);
+        (INDIA_LOCATIONS[state] || []).forEach((d) => {
+            const opt = document.createElement("option");
+            opt.value = d;
+            opt.textContent = d;
+            if (d === selectedDistrict) opt.selected = true;
+            districtSel.appendChild(opt);
+        });
+    }
+
+    stateSel.addEventListener("change", () => populateDistricts(stateSel.value, null));
+    if (prefillState) populateDistricts(prefillState, prefillDistrict);
+})();
+</script>
