@@ -1,3 +1,4 @@
+
 -- Drop old tables if you want a fresh start (BACKUP DATA FIRST!)
 -- If you have existing data, use ALTER TABLE instead (see comments below)
 
@@ -11,6 +12,12 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(120) UNIQUE NOT NULL,
     phone VARCHAR(20),
     address TEXT,
+    door_no VARCHAR(50),
+    mandal VARCHAR(100),
+    district VARCHAR(100),
+    state VARCHAR(100),
+    pincode VARCHAR(10),
+    external_wallet_id VARCHAR(128),
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255),
     google_id VARCHAR(100) UNIQUE,
@@ -143,6 +150,15 @@ If you have existing data, DO NOT drop tables. Run these ALTER statements instea
 ALTER TABLE users ADD COLUMN IF NOT EXISTS public_user_id CHAR(16);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS door_no VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mandal VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS district VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS state VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pincode VARCHAR(10);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS external_wallet_id VARCHAR(128);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique
+    ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_status VARCHAR(20);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
