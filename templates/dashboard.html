@@ -39,9 +39,37 @@
     </div>
 </nav>
 
+<style>
+.avatar-circle-wrap { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
+.avatar-circle {
+    width: 84px; height: 84px; border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; font-weight: 700; color: #fff;
+    box-shadow: 0 8px 24px -8px rgba(99,102,241,0.5);
+}
+.avatar-edit-badge {
+    position: absolute; bottom: -2px; right: -2px;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #1e293b; border: 3px solid #0f172a;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.9rem; text-decoration: none;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+.avatar-edit-badge:hover { background: #6366f1; transform: scale(1.1); color: #fff; }
+</style>
 <div class="container py-4">
-    <div class="mb-4">
-        <h3 class="fw-bold">Hello, {{ user.full_name }}! <span class="fs-6 fw-normal text-muted">{{ now.strftime('%A, %d %B %Y') }}</span></h3>
+    <div class="mb-4 d-flex align-items-center gap-3">
+        <div class="avatar-circle-wrap">
+            <div class="avatar-circle">{{ user.full_name[0]|upper if user.full_name else "?" }}</div>
+            <a href="{{ url_for('edit_profile') }}" class="avatar-edit-badge" title="Edit Profile">
+                <i class="bi bi-pencil-fill"></i>
+            </a>
+        </div>
+        <div>
+            <h3 class="fw-bold mb-0">Hello, {{ user.full_name }}!</h3>
+            <span class="fs-6 fw-normal text-muted">{{ now.strftime('%A, %d %B %Y') }}</span>
+        </div>
     </div>
 
     <div class="row g-3 mb-4">
@@ -211,7 +239,7 @@
 
             <hr class="border-secondary my-4">
 
-            <p class="text-muted small mb-3">Every hexagon below is one real person. Levels 1–5 are how deep your referral chain goes; a highlighted, glowing hexagon means that slot has been referred (colored by their status), a dull dashed one means it hasn't been filled yet.</p>
+            <p class="text-muted small mb-3">Every hexagon below is one real person. Levels 1–5 are how deep your referral chain goes — each level shows 5 hexagons, and each hexagon fills up once its owner refers 6 people, so a fully complete level is 5 × 6 = 30 people. A highlighted, glowing hexagon means that slot has been referred (colored by their status), a dull dashed one means it hasn't been filled yet.</p>
             <div class="hexnet-mini-wrap" id="myNetworkWidget">
                 <div class="text-center text-muted py-3 w-100"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading your network…</div>
             </div>
