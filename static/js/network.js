@@ -338,11 +338,16 @@ const HexNetwork = (function () {
         const lvlColor = LEVEL_COLOR[center.level] || LEVEL_COLOR.Starter;
         const mids = hexEdgeMidpoints(cx, cy, opts.hexR);
         const shown = (satellites || []).slice(0, 6);
+        const filled = shown.filter(Boolean).length;
+        const complete = filled >= 6;
 
         let svg = `<svg viewBox="0 0 ${opts.w} ${opts.h}" class="hexnet-svg hexnet-sides-svg" preserveAspectRatio="xMidYMid meet">`;
-        svg += `<g class="hexnet-node hexnet-hex" data-id="${esc(center.id)}" ${opts.interactive ? 'tabindex="0" role="button"' : ""} aria-label="${esc(center.name)}">
+        svg += `<g class="hexnet-node hexnet-hex ${complete ? "hexnet-hex-complete" : ""}" data-id="${esc(center.id)}" ${opts.interactive ? 'tabindex="0" role="button"' : ""} aria-label="${esc(center.name)}, ${filled} of 6 referral slots filled">
             <polygon points="${hexPoints(cx, cy, opts.hexR)}" class="hexnet-hexagon" style="--lvl:${lvlColor}"/>
-            <text x="${cx}" y="${cy}" class="hexnet-hex-label">${esc(shortLabel(center.name))}</text>
+            <text x="${cx}" y="${cy - 10}" class="hexnet-hex-label">${esc(shortLabel(center.name))}</text>
+            ${complete
+                ? `<text x="${cx}" y="${cy + 16}" class="hexnet-hex-count hexnet-hex-count-done">&#10003;</text>`
+                : `<text x="${cx}" y="${cy + 16}" class="hexnet-hex-count">${filled}/6</text>`}
         </g>`;
 
         for (let i = 0; i < 6; i++) {
