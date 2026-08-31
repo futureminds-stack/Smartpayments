@@ -449,6 +449,7 @@ def register():
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
         ref_code = request.form.get("referral_id", "").strip().upper()
+        external_wallet_id = request.form.get("external_wallet_id", "").strip()
 
         errors = []
         if not full_name or len(full_name) < 2:
@@ -458,6 +459,8 @@ def register():
         if phone_err:
             errors.append(phone_err)
         errors.extend(addr_errors)
+        if len(external_wallet_id) > 128:
+            errors.append("Crypto wallet ID must be 128 characters or fewer.")
         if not username or len(username) < 3:
             errors.append("Username must be at least 3 characters.")
         errors.extend(password_errors(password))
@@ -476,6 +479,12 @@ def register():
                 if cur.fetchone():
                     flash("Email or username already exists.", "danger")
                     return render_template("register.html", ref_code=ref_code)
+
+                if external_wallet_id:
+                    cur.execute("SELECT id FROM users WHERE external_wallet_id = %s", (external_wallet_id,))
+                    if cur.fetchone():
+                        flash("That crypto wallet ID is already registered to another account.", "danger")
+                        return render_template("register.html", ref_code=ref_code)
 
                 referrer_id = None
                 if ref_code:
@@ -497,12 +506,12 @@ def register():
                 cur.execute("""
                     INSERT INTO users 
                     (public_user_id, full_name, email, phone, address, door_no, mandal, district, state, pincode,
-                     username, password_hash, referral_id, status, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
+                     external_wallet_id, username, password_hash, referral_id, status, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
                     RETURNING id, public_user_id
                 """, (public_id, full_name, email, phone, address,
                       addr_parts["door_no"], addr_parts["mandal"], addr_parts["district"],
-                      addr_parts["state"], addr_parts["pincode"],
+                      addr_parts["state"], addr_parts["pincode"], external_wallet_id or None,
                       username, password_hash, referrer_id))
                 new_user = cur.fetchone()
 
@@ -576,6 +585,7 @@ def complete_google_profile():
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
         ref_code = request.form.get("referral_id", "").strip().upper()
+        external_wallet_id = request.form.get("external_wallet_id", "").strip()
 
         errors = []
         if not full_name:
@@ -583,6 +593,8 @@ def complete_google_profile():
         if phone_err:
             errors.append(phone_err)
         errors.extend(addr_errors)
+        if len(external_wallet_id) > 128:
+            errors.append("Crypto wallet ID must be 128 characters or fewer.")
         if not username or len(username) < 3:
             errors.append("Username must be at least 3 characters.")
         errors.extend(password_errors(password))
@@ -609,6 +621,15 @@ def complete_google_profile():
                                            name=session.get("google_name", ""),
                                            ref_code=ref_code)
 
+                if external_wallet_id:
+                    cur.execute("SELECT id FROM users WHERE external_wallet_id = %s", (external_wallet_id,))
+                    if cur.fetchone():
+                        flash("That crypto wallet ID is already registered to another account.", "danger")
+                        return render_template("complete_google_profile.html",
+                                               email=session.get("google_email"),
+                                               name=session.get("google_name", ""),
+                                               ref_code=ref_code)
+
                 referrer_id = None
                 if ref_code:
                     cur.execute("SELECT public_user_id FROM users WHERE public_user_id = %s AND status = 'approved'", (ref_code,))
@@ -627,12 +648,12 @@ def complete_google_profile():
                 cur.execute("""
                     INSERT INTO users 
                     (public_user_id, full_name, email, phone, address, door_no, mandal, district, state, pincode,
-                     username, password_hash, google_id, referral_id, status, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
+                     external_wallet_id, username, password_hash, google_id, referral_id, status, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW())
                     RETURNING id, public_user_id
                 """, (public_id, full_name, session["google_email"], phone, address,
                       addr_parts["door_no"], addr_parts["mandal"], addr_parts["district"],
-                      addr_parts["state"], addr_parts["pincode"],
+                      addr_parts["state"], addr_parts["pincode"], external_wallet_id or None,
                       username, password_hash, session.get("google_id"), referrer_id))
                 new_user = cur.fetchone()
 
@@ -832,6 +853,7 @@ def edit_profile():
                 full_name = request.form.get("full_name", "").strip()
                 phone, phone_err = validate_phone(request.form.get("phone", ""))
                 addr_parts, address, addr_errors = build_address_fields(request.form)
+                external_wallet_id = request.form.get("external_wallet_id", "").strip()
 
                 errors = []
                 if not full_name or len(full_name) < 2:
@@ -839,20 +861,30 @@ def edit_profile():
                 if phone_err:
                     errors.append(phone_err)
                 errors.extend(addr_errors)
+                if len(external_wallet_id) > 128:
+                    errors.append("Crypto wallet ID must be 128 characters or fewer.")
 
                 if errors:
                     for e in errors:
                         flash(e, "danger")
                     return redirect(url_for("edit_profile"))
 
+                if external_wallet_id:
+                    cur.execute("SELECT id FROM users WHERE external_wallet_id = %s AND id != %s",
+                                (external_wallet_id, session["user_id"]))
+                    if cur.fetchone():
+                        flash("That crypto wallet ID is already registered to another account.", "danger")
+                        return redirect(url_for("edit_profile"))
+
                 cur.execute("""
                     UPDATE users
                     SET full_name = %s, phone = %s, address = %s,
-                        door_no = %s, mandal = %s, district = %s, state = %s, pincode = %s
+                        door_no = %s, mandal = %s, district = %s, state = %s, pincode = %s,
+                        external_wallet_id = %s
                     WHERE id = %s
                 """, (full_name, phone, address,
                       addr_parts["door_no"], addr_parts["mandal"], addr_parts["district"],
-                      addr_parts["state"], addr_parts["pincode"],
+                      addr_parts["state"], addr_parts["pincode"], external_wallet_id or None,
                       session["user_id"]))
                 conn.commit()
                 session["full_name"] = full_name
@@ -1440,7 +1472,7 @@ def admin_wallets():
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                SELECT public_user_id, full_name, email, status
+                SELECT public_user_id, full_name, email, status, external_wallet_id
                 FROM users
                 WHERE status = 'approved'
                 ORDER BY full_name ASC
@@ -1459,6 +1491,7 @@ def admin_wallets():
                 "email": u["email"],
                 "referral_id": u["public_user_id"],
                 "wallet_address": wallet.wallet_address(u["public_user_id"]),
+                "external_wallet_id": u["external_wallet_id"],
                 "balance": w["balance"] if w else None,
             })
 
