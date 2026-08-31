@@ -1,14 +1,13 @@
 /* ─── Global ─────────────────────────────────────────────── */
 :root {
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    /* Saffron -> India Green, standing in for the old indigo/violet pair.
-       Kept at the same lightness/saturation "weight" as the original
-       (#6366f1 / #8b5cf6) so every existing glow, shadow and opacity value
-       elsewhere in this file still reads correctly - only the hue moved. */
-    --accent: #6366f1;
-    --accent-secondary: #8b5cf6;
-    --accent-glow: rgba(99, 102, 241, 0.35);
+    /* Stable, high-contrast dark theme (WhatsApp-style teal/green),
+       replacing the old rotating-photo background. No JS, no images -
+       same background every load, every page. */
+    --bg-primary: #0b141a;
+    --bg-secondary: #111b21;
+    --accent: #25d366;
+    --accent-secondary: #128c7e;
+    --accent-glow: rgba(37, 211, 102, 0.35);
     --text-primary: #f8fafc;
     --text-muted: #cbd5e1;
     --border: rgba(255, 255, 255, 0.14);
@@ -22,37 +21,15 @@ html, body {
 }
 
 body {
-    background: var(--bg-primary);
+    background:
+        radial-gradient(circle at 15% 15%, rgba(18, 140, 126, 0.22), transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(7, 94, 84, 0.28), transparent 50%),
+        linear-gradient(180deg, #0b141a 0%, #111b21 100%);
+    background-attachment: fixed;
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
-}
-
-/* ─── Dynamic nature wallpaper (iPhone-style Liquid Glass background) ── */
-.wallpaper-layer {
-    position: fixed;
-    inset: 0;
-    z-index: -2;
-    background-size: cover;
-    background-position: center;
-    opacity: 0;
-    transition: opacity 2.5s ease-in-out;
-    will-change: opacity;
-}
-
-.wallpaper-layer.active {
-    opacity: 1;
-}
-
-.wallpaper-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    /* Darkens/cools the photo just enough that white glass text stays readable
-       over any wallpaper, without hiding the scenery */
-    background:
-        linear-gradient(180deg, rgba(8, 12, 22, 0.55) 0%, rgba(8, 12, 22, 0.35) 40%, rgba(8, 12, 22, 0.65) 100%);
 }
 
 /* ─── Auth Pages ─────────────────────────────────────────── */
@@ -305,14 +282,6 @@ a.text-decoration-none:hover { text-decoration: underline; text-decoration-color
     .stat-card { padding: 1rem; }
 }
 
-/* ─── Reduced motion / low-power fallback ───────────────────
-   Respect the user's OS-level preference: skip the crossfade animation
-   and just let the background swap instantly if they've asked for less
-   motion. */
-@media (prefers-reduced-motion: reduce) {
-    .wallpaper-layer { transition: none; }
-}
-
 /* ─── Admin nav bar (shared by admin dashboard + network explorer) ── */
 .admin-nav { position: relative; background: rgba(15,23,42,0.98); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.05); }
 
@@ -326,7 +295,7 @@ a.text-decoration-none:hover { text-decoration: underline; text-decoration-color
 .hexnet-node:focus-visible .hexnet-dot { stroke: #fff; stroke-width: 3; }
 
 .hexnet-hexagon {
-    fill: rgba(99, 102, 241, 0.18);
+    fill: rgba(37, 211, 102, 0.18);
     stroke: var(--lvl, var(--accent));
     stroke-width: 2.5;
     filter: drop-shadow(0 0 10px var(--lvl, var(--accent-glow)));
@@ -334,7 +303,15 @@ a.text-decoration-none:hover { text-decoration: underline; text-decoration-color
     transform-origin: center;
     transform-box: fill-box;
 }
-.hexnet-node:hover .hexnet-hexagon { fill: rgba(99, 102, 241, 0.34); transform: scale(1.06); }
+.hexnet-node:hover .hexnet-hexagon { fill: rgba(37, 211, 102, 0.34); transform: scale(1.06); }
+
+/* Fully filled (6/6) hexagon: solid green fill instead of the faint tint,
+   so a completed hexagon is unmistakable at a glance. */
+.hexnet-hex-complete .hexnet-hexagon {
+    fill: rgba(37, 211, 102, 0.55);
+    stroke: #25d366;
+}
+.hexnet-hex-complete:hover .hexnet-hexagon { fill: rgba(37, 211, 102, 0.7); }
 
 .hexnet-hex-label {
     fill: var(--text-primary);
@@ -343,6 +320,20 @@ a.text-decoration-none:hover { text-decoration: underline; text-decoration-color
     text-anchor: middle;
     dominant-baseline: middle;
     pointer-events: none;
+}
+
+.hexnet-hex-count {
+    fill: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+.hexnet-hex-count-done {
+    fill: #25d366;
+    font-size: 20px;
+    font-weight: 900;
 }
 
 .hexnet-spoke { stroke: rgba(255, 255, 255, 0.22); stroke-width: 1.5; stroke-dasharray: 3 4; }
