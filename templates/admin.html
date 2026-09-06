@@ -20,6 +20,7 @@
         <div class="d-flex align-items-center gap-3">
             <span class="text-muted small"><i class="bi bi-person"></i> {{ session.full_name }}</span>
             <a href="{{ url_for('admin_network') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-hexagon"></i> Network</a>
+            <a href="{{ url_for('admin_wallets') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-wallet2"></i> Wallets &amp; Payments</a>
             <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">User View</a>
             <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger"><i class="bi bi-box-arrow-right"></i></a>
         </div>
@@ -97,7 +98,9 @@
                                 <div class="small text-muted mb-2">
                                     <div><i class="bi bi-envelope"></i> {{ u.email }}</div>
                                     <div><i class="bi bi-telephone"></i> {{ u.phone or 'N/A' }}</div>
-                                    <div><i class="bi bi-geo-alt"></i> {{ u.address or 'N/A' }}</div>
+                                    <div class="d-flex align-items-center gap-1"><i class="bi bi-geo-alt"></i> {{ u.address or 'N/A' }}
+                                        {% if u.address %}<button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy Address" onclick="copyToClipboard('{{ u.address }}')"><i class="bi bi-clipboard"></i></button>{% endif %}
+                                    </div>
                                     {% if u.referral_id %}<div><i class="bi bi-arrow-up-circle"></i> Referred by: {{ u.referral_id }}</div>{% endif %}
                                 </div>
                                 <div class="d-flex gap-2">
@@ -130,22 +133,34 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-dark table-hover mb-0">
-                            <thead><tr><th>ID</th><th>Name</th><th>Level</th><th>Referrals</th><th>Earned</th><th>Joined</th></tr></thead>
+                        <table class="table table-dark table-hover mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th class="text-nowrap">ID</th>
+                                    <th class="text-nowrap">Name</th>
+                                    <th class="text-nowrap">Wallet ID</th>
+                                    <th class="text-nowrap">Referrals</th>
+                                    <th class="text-nowrap">Joined</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 {% for u in approved_users %}
                                 <tr>
-                                    <td class="font-monospace small">
+                                    <td class="font-monospace small text-nowrap">
                                         <span class="d-flex align-items-center gap-1">
-                                            {{ u.public_user_id }}
-                                            <button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy ID" onclick="copyToClipboard('{{ u.public_user_id }}')"><i class="bi bi-clipboard"></i></button>
+                                            {{ u.id }}
+                                            <button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy System ID" onclick="copyToClipboard('{{ u.id }}')"><i class="bi bi-clipboard"></i></button>
                                         </span>
                                     </td>
-                                    <td>{{ u.full_name }}</td>
-                                    <td><span class="badge bg-secondary">{{ u.user_level }}</span></td>
-                                    <td>{{ u.referral_count }}</td>
-                                    <td class="text-success">{{ format_currency(u.amount_earned) }}</td>
-                                    <td class="text-muted small">{{ u.created_at.strftime('%d %b') }}</td>
+                                    <td class="text-nowrap">{{ u.full_name }}</td>
+                                    <td class="font-monospace small text-nowrap">
+                                        <span class="d-flex align-items-center gap-1">
+                                            {{ u.public_user_id }}
+                                            <button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy Wallet ID" onclick="copyToClipboard('{{ u.public_user_id }}')"><i class="bi bi-clipboard"></i></button>
+                                        </span>
+                                    </td>
+                                    <td class="text-nowrap">{{ u.referral_count }}</td>
+                                    <td class="text-muted small text-nowrap">{{ u.created_at.strftime('%d %b %Y, %I:%M %p') }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -227,57 +242,6 @@
                     <div class="text-center py-4 text-muted">
                         <i class="bi bi-hourglass fs-1"></i>
                         <p>No resolved reset requests yet.</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="card bg-dark border-secondary mb-4">
-                <div class="card-header border-secondary d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-cash-stack text-success"></i> Payment History</h5>
-                    <span class="text-muted small">Wallet-to-wallet transfers</span>
-                </div>
-                <div class="card-body" style="max-height: 420px; overflow-y: auto;">
-                    {% if not wallet_enabled %}
-                    <div class="text-center py-4 text-muted">
-                        <i class="bi bi-wallet2 fs-1"></i>
-                        <p class="mb-0">Wallet is not configured (MONGODB_URI not set) — no payment data to show yet.</p>
-                    </div>
-                    {% elif payment_history %}
-                    <div class="table-responsive">
-                        <table class="table table-dark table-sm align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Txn ID</th>
-                                    <th>From</th>
-                                    <th>To</th>
-                                    <th>Amount</th>
-                                    <th>When</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for t in payment_history %}
-                                <tr>
-                                    <td class="font-monospace small">{{ t.txn_id }}</td>
-                                    <td>
-                                        <div>{{ t.from_name or '—' }}</div>
-                                        <div class="text-muted small font-monospace">{{ t.from_id }}</div>
-                                    </td>
-                                    <td>
-                                        <div>{{ t.to_name or '—' }}</div>
-                                        <div class="text-muted small font-monospace">{{ t.to_id }}</div>
-                                    </td>
-                                    <td class="text-success fw-bold">₹{{ "%.2f"|format(t.amount) }}</td>
-                                    <td class="text-muted small">{{ t.created_at_display }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-4 text-muted">
-                        <i class="bi bi-cash fs-1"></i>
-                        <p class="mb-0">No wallet transfers yet.</p>
                     </div>
                     {% endif %}
                 </div>
