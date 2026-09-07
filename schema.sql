@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     google_id VARCHAR(100) UNIQUE,
 
     -- Referral system
-    referral_id CHAR(16) REFERENCES users(public_user_id) ON DELETE SET NULL,
+    referral_id CHAR(16) REFERENCES users(public_user_id) ON DELETE SET NULL ON UPDATE CASCADE,
     referral_count INTEGER DEFAULT 0,
     amount_earned DECIMAL(12,2) DEFAULT 0.00,
     user_level VARCHAR(20) DEFAULT 'Starter',
@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS password_reset_requests (
 -- ============================================
 CREATE TABLE IF NOT EXISTS referrals (
     id SERIAL PRIMARY KEY,
-    referrer_id CHAR(16) REFERENCES users(public_user_id),
-    referred_id CHAR(16) REFERENCES users(public_user_id),
+    referrer_id CHAR(16) REFERENCES users(public_user_id) ON UPDATE CASCADE,
+    referred_id CHAR(16) REFERENCES users(public_user_id) ON UPDATE CASCADE,
     status VARCHAR(20) DEFAULT 'pending',
     reward_amount DECIMAL(12,2) DEFAULT 100.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -156,6 +156,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS district VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS state VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS pincode VARCHAR(10);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS external_wallet_id VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_id_set_by_user BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique
     ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL;
