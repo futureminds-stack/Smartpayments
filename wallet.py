@@ -147,6 +147,24 @@ def credit_wallet(referral_id, amount, reason=None, full_name=None):
     return get_wallet(referral_id)
 
 
+def rename_wallet(old_referral_id, new_referral_id):
+    """Move a wallet + its transaction history from one Referral ID key
+    to another. Used when a user sets/changes their own Wallet ID after
+    already having a wallet under the auto-assigned one. No-op if the
+    IDs are the same or there's nothing to move."""
+    if not old_referral_id or old_referral_id == new_referral_id:
+        return
+    db = _get_db()
+    w = db.wallets.find_one({"referral_id": old_referral_id})
+    if w:
+        db.wallets.delete_one({"referral_id": old_referral_id})
+        w.pop("_id", None)
+        w["referral_id"] = new_referral_id
+        db.wallets.update_one({"referral_id": new_referral_id}, {"$set": w}, upsert=True)
+    db.transactions.update_many({"from_id": old_referral_id}, {"$set": {"from_id": new_referral_id}})
+    db.transactions.update_many({"to_id": old_referral_id}, {"$set": {"to_id": new_referral_id}})
+
+
 def transfer(from_id, to_id, amount, from_name=None, to_name=None):
     """Move `amount` from from_id's wallet to to_id's wallet atomically.
     Raises WalletError for any user-facing validation failure."""
