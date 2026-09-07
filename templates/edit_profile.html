@@ -11,8 +11,15 @@
 </nav>
 
 <div class="container py-4" style="max-width: 640px;">
-    <h3 class="fw-bold mb-1"><i class="bi bi-person-gear"></i> Edit Profile</h3>
-    <p class="text-muted small mb-4">Changes save straight to your account when you submit — no need to wait for approval.</p>
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:#fff;">
+            {{ user.full_name[0]|upper if user.full_name else "?" }}
+        </div>
+        <div>
+            <h3 class="fw-bold mb-0"><i class="bi bi-person-gear"></i> Edit Profile</h3>
+            <p class="text-muted small mb-0">Changes save straight to your account when you submit — no need to wait for approval.</p>
+        </div>
+    </div>
 
     <div class="card bg-dark border-secondary">
         <div class="card-body">
@@ -37,8 +44,39 @@
                            placeholder="10-digit mobile number" required>
                 </div>
 
-                {% set prefill = user %}
-                {% include "_address_fields.html" with context %}
+                <div class="mb-3">
+                    <label class="form-label">Wallet ID
+                        {% if not user.wallet_id_set_by_user %}
+                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-exclamation-triangle"></i> Not set by you yet</span>
+                        {% endif %}
+                    </label>
+                    <div class="input-group">
+                        <input type="text" name="wallet_id" id="walletIdField" class="form-control font-monospace"
+                               maxlength="16" value="{{ user.public_user_id }}"
+                               pattern="[A-Za-z0-9]{16}" title="Exactly 16 letters/numbers">
+                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('walletIdField').value)" title="Copy"><i class="bi bi-clipboard"></i></button>
+                    </div>
+                    {% if not user.wallet_id_set_by_user %}
+                    <div class="form-text text-warning">This ID was assigned automatically because it was left blank at signup. Set your own here any time — it's still unique and used everywhere (referrals, wallet balance).</div>
+                    {% else %}
+                    <div class="form-text">Change this and your balance, referrals, and links move with it automatically.</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Your Crypto Wallet ID <small class="text-muted">(optional)</small></label>
+                    <input type="text" name="external_wallet_id" class="form-control font-monospace" maxlength="128"
+                           value="{{ user.external_wallet_id or '' }}"
+                           placeholder="Paste your wallet address, e.g. 0x1a2B3c... or a Binance deposit address">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Address</span>
+                        <span class="text-muted small" id="addressCount">0/80</span>
+                    </label>
+                    <textarea name="address" id="addressField" class="form-control" rows="2" maxlength="80" placeholder="Your address">{{ user.address or '' }}</textarea>
+                </div>
 
                 <button type="submit" class="btn btn-primary w-100 btn-glow mt-2">
                     <i class="bi bi-check-circle"></i> Save Changes
@@ -54,6 +92,20 @@
     const phone = document.getElementById("phoneField");
     if (phone) phone.addEventListener("input", () => {
         phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
+    });
+    const field = document.getElementById("addressField");
+    const count = document.getElementById("addressCount");
+    if (field && count) {
+        const update = () => {
+            count.textContent = field.value.length + "/80";
+            count.classList.toggle("text-warning", field.value.length >= 70);
+        };
+        field.addEventListener("input", update);
+        update();
+    }
+    const walletField = document.getElementById("walletIdField");
+    if (walletField) walletField.addEventListener("input", () => {
+        walletField.value = walletField.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
     });
 })();
 </script>
