@@ -47,15 +47,16 @@
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label">Wallet ID <small class="text-muted">(required, unique — this becomes your account/Referral ID)</small></label>
+                <label class="form-label">Wallet ID <small class="text-muted">(optional — only set if you type one yourself)</small></label>
                 <div class="input-group">
                     <input type="text" name="wallet_id" id="walletIdField" class="form-control font-monospace"
-                           maxlength="16" value="{{ suggested_wallet_id }}" required
+                           maxlength="16" value="{{ suggested_wallet_id }}"
+                           placeholder="Leave blank to have one assigned automatically"
                            pattern="[A-Za-z0-9]{16}" title="Exactly 16 letters/numbers">
-                    <button type="button" class="btn btn-outline-secondary" id="regenWalletId" title="Generate a new suggestion"><i class="bi bi-arrow-repeat"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" id="regenWalletId" title="Suggest one for me"><i class="bi bi-arrow-repeat"></i></button>
                     <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('walletIdField').value)" title="Copy"><i class="bi bi-clipboard"></i></button>
                 </div>
-                <div class="form-text">We've suggested one for you — you can use it as-is, or edit it to any unique 16-character ID you like. If it's already taken, you'll be asked to pick another.</div>
+                <div class="form-text">If you leave this blank, we'll assign one automatically and you can set your own later from Edit Profile. If it's already taken, you'll be asked to pick another.</div>
             </div>
             <div class="mb-3">
                 <label class="form-label">External Crypto Wallet <small class="text-muted">(optional)</small></label>
