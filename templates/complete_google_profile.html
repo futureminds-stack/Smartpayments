@@ -28,7 +28,31 @@
                     </div>
                 </div>
             </div>
-            {% include "_address_fields.html" with context %}
+            <div class="mb-3">
+                <label class="form-label">Wallet ID <small class="text-muted">(optional — only set if you type one yourself)</small></label>
+                <div class="input-group">
+                    <input type="text" name="wallet_id" id="walletIdField" class="form-control font-monospace"
+                           maxlength="16" value="{{ suggested_wallet_id }}"
+                           placeholder="Leave blank to have one assigned automatically"
+                           pattern="[A-Za-z0-9]{16}" title="Exactly 16 letters/numbers">
+                    <button type="button" class="btn btn-outline-secondary" id="regenWalletId" title="Suggest one for me"><i class="bi bi-arrow-repeat"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard(document.getElementById('walletIdField').value)" title="Copy"><i class="bi bi-clipboard"></i></button>
+                </div>
+                <div class="form-text">If you leave this blank, we'll assign one automatically and you can set your own later from Edit Profile. If it's already taken, you'll be asked to pick another.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">External Crypto Wallet <small class="text-muted">(optional)</small></label>
+                <input type="text" name="external_wallet_id" class="form-control font-monospace" maxlength="128"
+                       placeholder="Paste your own wallet address, e.g. 0x1a2B3c... or a Binance deposit address">
+                <div class="form-text">If you already have your own crypto wallet, paste its address here so payouts can reach it. You can add or change this later from Edit Profile.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label d-flex justify-content-between">
+                    <span>Address</span>
+                    <span class="text-muted small" id="addressCount">0/80</span>
+                </label>
+                <textarea name="address" id="addressField" class="form-control" rows="2" maxlength="80" placeholder="Your address"></textarea>
+            </div>
             <div class="mb-3">
                 <label class="form-label">Username</label>
                 <input type="text" name="username" class="form-control" placeholder="Choose a username" required>
@@ -58,6 +82,26 @@
     const phone = document.getElementById("phoneField");
     if (phone) phone.addEventListener("input", () => {
         phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
+    });
+    const field = document.getElementById("addressField");
+    const count = document.getElementById("addressCount");
+    if (field && count) {
+        const update = () => {
+            count.textContent = field.value.length + "/80";
+            count.classList.toggle("text-warning", field.value.length >= 70);
+        };
+        field.addEventListener("input", update);
+        update();
+    }
+    const walletField = document.getElementById("walletIdField");
+    const regenBtn = document.getElementById("regenWalletId");
+    if (walletField) walletField.addEventListener("input", () => {
+        walletField.value = walletField.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+    });
+    if (regenBtn && walletField) regenBtn.addEventListener("click", () => {
+        let id = "";
+        for (let i = 0; i < 16; i++) id += Math.floor(Math.random() * 10);
+        walletField.value = id;
     });
 })();
 </script>
