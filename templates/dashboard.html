@@ -99,7 +99,7 @@
                 <div class="d-flex align-items-center gap-3 mb-2">
                     <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-hash"></i></div>
                 </div>
-                <div class="text-muted small">Your Wallet ID</div>
+                <div class="text-muted small">System Generated ID</div>
                 <div class="font-monospace fw-bold text-truncate" id="wallet-id" style="font-size: 0.85rem;">{{ wallet_id_display }}</div>
                 <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyToClipboard('{{ wallet_id_display }}')">
                     <i class="bi bi-clipboard"></i> Copy
@@ -165,10 +165,10 @@
                         </div>
                         <form method="POST" action="{{ url_for('wallet_transfer') }}" class="mb-3">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <label class="form-label small text-muted">Send money to another account</label>
+                            <label class="form-label small text-muted">Send money to another account (by Wallet ID only)</label>
                             <div class="input-group mb-2">
                                 <span class="input-group-text bg-dark text-muted border-secondary"><i class="bi bi-hash"></i></span>
-                                <input type="text" name="to_referral_id" class="form-control bg-dark text-light border-secondary" placeholder="Recipient's Referral ID" required maxlength="16">
+                                <input type="text" name="to_referral_id" class="form-control bg-dark text-light border-secondary" placeholder="Recipient's Wallet ID" required maxlength="16" pattern="[A-Za-z0-9]{16}" title="Exactly 16 letters/numbers">
                             </div>
                             <div class="input-group">
                                 <span class="input-group-text bg-dark text-muted border-secondary">₹</span>
