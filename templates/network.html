@@ -219,6 +219,18 @@
         });
     }
 
+    function renderError(message) {
+        area.innerHTML = `<div class="card bg-dark border-secondary"><div class="card-body">
+            <div class="hexnet-detail-empty py-5 text-center">
+                <i class="bi bi-exclamation-triangle fs-1 d-block mb-2 text-warning"></i>
+                ${HexNetwork.esc(message)}
+                <div class="mt-3"><button type="button" class="btn btn-sm btn-outline-light" id="retryLoadBtn"><i class="bi bi-arrow-clockwise"></i> Retry</button></div>
+            </div>
+        </div></div>`;
+        const retryBtn = document.getElementById("retryLoadBtn");
+        if (retryBtn) retryBtn.addEventListener("click", () => refetchCurrent(false));
+    }
+
     async function loadOverview() {
         state.path = [{ id: null, name: "Overview" }];
         try {
@@ -229,6 +241,7 @@
             setLive(timeAgo());
         } catch (e) {
             setLive("Live updates paused (connection issue)");
+            if (lastPayloadJSON === null) renderError("Couldn't load the referral network. This page needs admin access and a working connection to the server.");
         }
     }
 
@@ -242,6 +255,7 @@
             setLive(timeAgo());
         } catch (e) {
             setLive("Live updates paused (connection issue)");
+            if (!silent) renderError("Couldn't load that account's network. Please try again.");
         }
     }
 
