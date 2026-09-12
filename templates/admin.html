@@ -98,9 +98,6 @@
                                 <div class="small text-muted mb-2">
                                     <div><i class="bi bi-envelope"></i> {{ u.email }}</div>
                                     <div><i class="bi bi-telephone"></i> {{ u.phone or 'N/A' }}</div>
-                                    <div class="d-flex align-items-center gap-1"><i class="bi bi-geo-alt"></i> {{ u.address or 'N/A' }}
-                                        {% if u.address %}<button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy Address" onclick="copyToClipboard('{{ u.address }}')"><i class="bi bi-clipboard"></i></button>{% endif %}
-                                    </div>
                                     {% if u.referral_id %}<div><i class="bi bi-arrow-up-circle"></i> Referred by: {{ u.referral_id }}</div>{% endif %}
                                 </div>
                                 <div class="d-flex gap-2">
@@ -157,13 +154,6 @@
                                         <span class="d-flex align-items-center gap-1">
                                             {{ u.public_user_id }}
                                             <button type="button" class="btn btn-sm btn-link text-muted p-0" title="Copy Wallet ID" onclick="copyToClipboard('{{ u.public_user_id }}')"><i class="bi bi-clipboard"></i></button>
-                                            {% if not u.wallet_id_set_by_user %}
-                                            <span class="badge bg-warning text-dark" title="Auto-assigned — user hasn't set their own yet">Auto</span>
-                                            <form method="POST" action="{{ url_for('admin_remind_wallet_id', user_id=u.id) }}" class="d-inline">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-1" title="Email a reminder to set their own Wallet ID"><i class="bi bi-envelope"></i></button>
-                                            </form>
-                                            {% endif %}
                                         </span>
                                     </td>
                                     <td class="text-nowrap">{{ u.referral_count }}</td>
