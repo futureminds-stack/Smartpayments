@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard<div class="modal fade" id="payModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content glass text-center p-4"><div id="loadState"><div class="spinner-border text-primary" style="width:4rem;height:4rem"></div><h4 class="mt-3">Processing Payment</h4><p class="text-muted">Please wait...</p></div><div id="successState" style="display:none"><div class="bg-success rounded-circle d-inline-flex align-items-center justify-content-center" style="width:88px;height:88px"><i class="bi bi-check-lg text-white" style="font-size:3rem"></i></div><h3 class="mt-3 text-success">Payment Successful</h3><p class="text-muted">Transfer completed successfully.</p></div></div></div></div><script>document.querySelectorAll('form[action*="wallet_transfer"]').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();const m=new bootstrap.Modal(document.getElementById('payModal'));m.show();setTimeout(()=>{loadState.style.display='none';successState.style.display='block';setTimeout(()=>f.submit(),900)},1800)}));</script>{% endblock %}
 {% block extra_css %}
 <style>
 .dashboard-nav { background: rgba(15,23,42,0.95); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -15,8 +15,11 @@
 .level-Gold { background: rgba(234,179,8,0.2); color: #fbbf24; }
 .level-Diamond { background: rgba(6,182,212,0.2); color: #22d3ee; }
 .level-Legend { background: linear-gradient(90deg, #f59e0b, #ef4444); color: white; }
+
+.glass{background:rgba(255,255,255,.08);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 40px rgba(0,0,0,.25)}
+.hex-wrap{display:flex;justify-content:center;align-items:center;padding:24px}.hex{width:240px;height:240px;position:relative;animation:float 6s ease-in-out infinite}.hex svg{position:absolute;inset:0}.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}.pulse{animation:pulse 2s infinite}@keyframes pulse{50%{transform:scale(1.06)}}@keyframes float{50%{transform:translateY(-6px)}}
 </style>
-{% endblock %}
+<div class="modal fade" id="payModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content glass text-center p-4"><div id="loadState"><div class="spinner-border text-primary" style="width:4rem;height:4rem"></div><h4 class="mt-3">Processing Payment</h4><p class="text-muted">Please wait...</p></div><div id="successState" style="display:none"><div class="bg-success rounded-circle d-inline-flex align-items-center justify-content-center" style="width:88px;height:88px"><i class="bi bi-check-lg text-white" style="font-size:3rem"></i></div><h3 class="mt-3 text-success">Payment Successful</h3><p class="text-muted">Transfer completed successfully.</p></div></div></div></div><script>document.querySelectorAll('form[action*="wallet_transfer"]').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();const m=new bootstrap.Modal(document.getElementById('payModal'));m.show();setTimeout(()=>{loadState.style.display='none';successState.style.display='block';setTimeout(()=>f.submit(),900)},1800)}));</script>{% endblock %}
 {% block content %}
 <nav class="navbar navbar-expand-lg dashboard-nav sticky-top">
     <div class="container">
@@ -150,9 +153,9 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="card glass mb-4"><div class="card-body"><div class="d-flex justify-content-between align-items-center mb-2"><div><h4 class="mb-0">Referral Hexagon</h4><p class="text-muted mb-0">Each approved user fills one side</p></div>{% if user.referral_count>=6 %}<span class="badge bg-success pulse">Level Completed</span>{% endif %}</div><div class="hex-wrap"><div class="hex"><svg viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient></defs><polygon points="100,20 169,60 169,140 100,180 31,140 31,60" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.15)" stroke-width="2"/>{% set pts=[((100,20),(169,60)),((169,60),(169,140)),((169,140),(100,180)),((100,180),(31,140)),((31,140),(31,60)),((31,60),(100,20))] %}{% for seg in pts %}<line x1="{{seg[0][0]}}" y1="{{seg[0][1]}}" x2="{{seg[1][0]}}" y2="{{seg[1][1]}}" stroke="{% if user.referral_count>loop.index0 %}url(#g){% else %}rgba(255,255,255,.18){% endif %}" stroke-width="8" stroke-linecap="round"/></svg><div class="center"><div class="display-5 fw-bold">{{ [user.referral_count,6]|min }}/6</div><div class="text-muted">Users</div></div></div></div></div></div><div class="row g-3 mb-4">
         <div class="col-lg-5">
-            <div class="card bg-dark border-secondary h-100">
+            <div class="card glass h-100">
                 <div class="card-header border-secondary">
                     <h5 class="mb-0"><i class="bi bi-wallet2 text-success"></i> My Wallet</h5>
                 </div>
@@ -186,7 +189,7 @@
             </div>
         </div>
         <div class="col-lg-7">
-            <div class="card bg-dark border-secondary h-100">
+            <div class="card glass h-100">
                 <div class="card-header border-secondary">
                     <h5 class="mb-0"><i class="bi bi-clock-history text-info"></i> Recent Wallet Activity</h5>
                 </div>
@@ -305,7 +308,7 @@
         </div>
     </div>
 </div>
-{% endblock %}
+<div class="modal fade" id="payModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content glass text-center p-4"><div id="loadState"><div class="spinner-border text-primary" style="width:4rem;height:4rem"></div><h4 class="mt-3">Processing Payment</h4><p class="text-muted">Please wait...</p></div><div id="successState" style="display:none"><div class="bg-success rounded-circle d-inline-flex align-items-center justify-content-center" style="width:88px;height:88px"><i class="bi bi-check-lg text-white" style="font-size:3rem"></i></div><h3 class="mt-3 text-success">Payment Successful</h3><p class="text-muted">Transfer completed successfully.</p></div></div></div></div><script>document.querySelectorAll('form[action*="wallet_transfer"]').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();const m=new bootstrap.Modal(document.getElementById('payModal'));m.show();setTimeout(()=>{loadState.style.display='none';successState.style.display='block';setTimeout(()=>f.submit(),900)},1800)}));</script>{% endblock %}
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/network.js') }}"></script>
 <script>
@@ -357,4 +360,4 @@
     }
 })();
 </script>
-{% endblock %}
+<div class="modal fade" id="payModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content glass text-center p-4"><div id="loadState"><div class="spinner-border text-primary" style="width:4rem;height:4rem"></div><h4 class="mt-3">Processing Payment</h4><p class="text-muted">Please wait...</p></div><div id="successState" style="display:none"><div class="bg-success rounded-circle d-inline-flex align-items-center justify-content-center" style="width:88px;height:88px"><i class="bi bi-check-lg text-white" style="font-size:3rem"></i></div><h3 class="mt-3 text-success">Payment Successful</h3><p class="text-muted">Transfer completed successfully.</p></div></div></div></div><script>document.querySelectorAll('form[action*="wallet_transfer"]').forEach(f=>f.addEventListener('submit',e=>{e.preventDefault();const m=new bootstrap.Modal(document.getElementById('payModal'));m.show();setTimeout(()=>{loadState.style.display='none';successState.style.display='block';setTimeout(()=>f.submit(),900)},1800)}));</script>{% endblock %}
