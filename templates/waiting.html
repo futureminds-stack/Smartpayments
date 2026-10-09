@@ -42,3 +42,9 @@
     </div>
 </div>
 {% endblock %}
+{% block extra_js %}
+<script>
+// Check again every 30s - once an admin approves the account, the server redirects to login.
+setTimeout(function () { window.location.reload(); }, 30000);
+</script>
+{% endblock %}

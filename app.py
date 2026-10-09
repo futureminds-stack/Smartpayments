@@ -6,7 +6,7 @@ import traceback
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
@@ -17,6 +17,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool
 from flask_wtf import CSRFProtect
+from flask_wtf.csrf import CSRFError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -183,6 +184,62 @@ def get_db():
 def release_db(conn):
     db_pool.putconn(conn)
 
+def ensure_schema():
+    """Self-heal older / hand-made databases on startup.
+
+    The code reads and writes users.wallet_id_set_by_user (registration,
+    admin dashboard, admin wallets page), but schema.sql, reset_database.sql
+    and migration.sql never created it - only the separate
+    wallet_id_flag_migration.sql did. Any database built from the main
+    scripts therefore crashed on the first registration / admin page load
+    with 'column does not exist'. These statements are idempotent and
+    cheap, so it is safe to run them on every boot.
+    """
+    stmts = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_id_set_by_user BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS external_wallet_id VARCHAR(128)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique "
+        "ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL",
+    ]
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
+            for stmt in stmts:
+                try:
+                    cur.execute(stmt)
+                    conn.commit()
+                except Exception as e:
+                    conn.rollback()
+                    logger.warning(f"ensure_schema skipped ({stmt[:60]}...): {e}")
+    except Exception as e:
+        logger.warning(f"ensure_schema could not run: {e}")
+    finally:
+        if conn is not None:
+            try:
+                db_pool.putconn(conn)
+            except Exception:
+                pass
+
+ensure_schema()
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def format_ts(ts):
+    """Unix timestamp -> 'dd Mon yyyy, hh:mm AM' in India time (the server
+    runs in UTC on Render, which made every timestamp look hours off)."""
+    if not ts:
+        return "-"
+    try:
+        return datetime.fromtimestamp(float(ts), IST).strftime("%d %b %Y, %I:%M %p")
+    except Exception:
+        return "-"
+
+def wants_json():
+    """True for fetch()/XHR callers (the animated payment flow)."""
+    return (request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or request.accept_mimetypes.best == "application/json")
+
 # ─── Google OAuth client (registered once, not per-request) ──
 google_oauth_client = None
 if os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET"):
@@ -337,6 +394,11 @@ def google_login():
         return redirect(url_for("login"))
 
     try:
+        # Remember the referral code across the round trip to Google: on the
+        # callback, request.args holds Google's own params (code/state), so
+        # reading ?ref= there always returned '' and every Google signup
+        # silently lost its referrer.
+        session["google_ref"] = request.args.get("ref", "").strip().upper()
         redirect_uri = url_for("google_callback", _external=True)
         return google_oauth_client.authorize_redirect(redirect_uri)
     except Exception as e:
@@ -398,7 +460,7 @@ def google_callback():
                 session["google_email"] = email
                 session["google_name"] = name
                 session["google_id"] = google_id
-                ref_code = request.args.get("ref", "").strip().upper()
+                ref_code = session.pop("google_ref", "")
                 return redirect(url_for("complete_google_profile", ref=ref_code))
         finally:
             release_db(conn)
@@ -724,6 +786,7 @@ def login():
                     cur.execute("UPDATE users SET last_login = NOW() WHERE id = %s", (user["id"],))
                     conn.commit()
 
+                session.clear()  # drop any stale/pre-login session data
                 session["user_id"] = user["id"]
                 session["public_id"] = user["public_user_id"]
                 session["username"] = user["username"]
@@ -792,6 +855,8 @@ def dashboard():
                 my_wallet = wallet.get_wallet(user["public_user_id"]) or \
                             wallet.init_wallet(user["public_user_id"], user["full_name"])
                 wallet_txns = wallet.get_transactions(user["public_user_id"])
+                for t in wallet_txns:
+                    t["created_at_display"] = format_ts(t.get("created_at"))
             except Exception as e:
                 logger.error(f"Wallet load error for {user['public_user_id']}: {e}")
                 my_wallet = None
@@ -882,11 +947,55 @@ def edit_profile():
 # ═════════════════════════════════════════════════════════════
 # WALLET (balances + transfers live in MongoDB - see wallet.py)
 # ═════════════════════════════════════════════════════════════
+def _lookup_recipient(cur, to_ref_id):
+    """Approved account for a Referral ID, or None."""
+    if not re.fullmatch(r"[A-Za-z0-9]{16}", to_ref_id or ""):
+        return None
+    cur.execute("""SELECT public_user_id, full_name FROM users
+                   WHERE public_user_id = %s AND status = 'approved'""", (to_ref_id,))
+    return cur.fetchone()
+
+@app.route("/api/wallet/recipient")
+@limiter.limit("40 per minute")
+def wallet_recipient():
+    """Name check shown on the 'confirm payment' step - same idea as the
+    payee-name verification in UPI apps, so money isn't sent to a mistyped ID."""
+    if "user_id" not in session:
+        return jsonify({"found": False, "error": "not_authenticated"}), 401
+    to_id = request.args.get("id", "").strip()
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            rec = _lookup_recipient(cur, to_id)
+        if not rec:
+            return jsonify({"found": False})
+        if rec["public_user_id"] == session.get("public_id"):
+            return jsonify({"found": False, "error": "self"})
+        return jsonify({"found": True, "id": rec["public_user_id"], "name": rec["full_name"]})
+    except Exception as e:
+        logger.error(f"Recipient lookup error: {e}")
+        return jsonify({"found": False, "error": "server_error"}), 500
+    finally:
+        release_db(conn)
+
 @app.route("/wallet/transfer", methods=["POST"])
 @limiter.limit("20 per hour")
 def wallet_transfer():
+    as_json = wants_json()
+
+    def fail(message, status=400, category="warning"):
+        if as_json:
+            return jsonify({"ok": False, "error": message}), status
+        flash(message, category)
+        return redirect(url_for("dashboard"))
+
     if "user_id" not in session:
+        if as_json:
+            return jsonify({"ok": False, "error": "Please log in again."}), 401
         return redirect(url_for("login"))
+
+    if not wallet.wallet_enabled():
+        return fail("Wallet is not configured yet.", 503, "danger")
 
     to_ref_id = request.form.get("to_referral_id", "").strip()
     amount = request.form.get("amount", "").strip()
@@ -899,23 +1008,42 @@ def wallet_transfer():
             me = cur.fetchone()
             if not me:
                 session.clear()
-                return redirect(url_for("login"))
+                return fail("Please log in again.", 401)
 
-            cur.execute("SELECT full_name FROM users WHERE public_user_id = %s", (to_ref_id,))
-            recipient = cur.fetchone()
+            recipient = _lookup_recipient(cur, to_ref_id)
 
-        new_balance = wallet.transfer(
-            me["public_user_id"], to_ref_id, amount,
-            from_name=me["full_name"],
-            to_name=recipient["full_name"] if recipient else None,
+        if not recipient:
+            return fail("Recipient Referral ID not found.")
+
+        # Accounts approved before MongoDB was configured have no wallet yet,
+        # which used to make every transfer to them fail with "Recipient not
+        # found". They're valid approved accounts, so create it on demand.
+        wallet.init_wallet(recipient["public_user_id"], recipient["full_name"])
+        wallet.init_wallet(me["public_user_id"], me["full_name"])
+
+        result = wallet.transfer(
+            me["public_user_id"], recipient["public_user_id"], amount,
+            from_name=me["full_name"], to_name=recipient["full_name"],
         )
-        flash(f"Sent {format_currency(float(amount))} to {to_ref_id}. "
-              f"New balance: {format_currency(new_balance)}.", "success")
+        msg = (f"Sent {format_currency(result['amount'])} to {recipient['full_name']}. "
+               f"New balance: {format_currency(result['balance'])}.")
+        if as_json:
+            return jsonify({
+                "ok": True,
+                "message": msg,
+                "txn_id": result["txn_id"],
+                "amount": result["amount"],
+                "new_balance": result["balance"],
+                "to_name": recipient["full_name"],
+                "to_id": recipient["public_user_id"],
+                "created_at_display": format_ts(result["created_at"]),
+            })
+        flash(msg, "success")
     except wallet.WalletError as e:
-        flash(str(e), "warning")
+        return fail(str(e))
     except Exception as e:
-        logger.error(f"Wallet transfer error: {e}")
-        flash("Wallet transfer failed. Please try again later.", "danger")
+        logger.error(f"Wallet transfer error: {e}\n{traceback.format_exc()}")
+        return fail("Wallet transfer failed. Please try again later.", 500, "danger")
     finally:
         release_db(conn)
 
@@ -1188,33 +1316,31 @@ def admin_dashboard():
 @admin_required
 def approve_user(user_id):
     conn = get_db()
+    updated = None
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT public_user_id, referral_id, status FROM users WHERE id = %s", (user_id,))
-            user = cur.fetchone()
-
-            if not user:
-                flash("User not found.", "danger")
-                return redirect(url_for("admin_dashboard"))
-
-            if user.get("status") != "pending":
-                flash("User is not pending approval.", "warning")
-                return redirect(url_for("admin_dashboard"))
-
+            # One atomic UPDATE ... WHERE status='pending': two admins (or a
+            # double-click) approving the same user at once can no longer
+            # both pass a separate SELECT check and credit the referrer twice.
             cur.execute("""
-                UPDATE users 
+                UPDATE users
                 SET status = 'approved', approved_at = NOW(), updated_at = NOW()
-                WHERE id = %s
-                RETURNING public_user_id, referral_id, referral_count, amount_earned, user_level
+                WHERE id = %s AND status = 'pending'
+                RETURNING public_user_id, full_name, referral_id
             """, (user_id,))
             updated = cur.fetchone()
 
-            if updated and updated.get("referral_id"):
+            if not updated:
+                conn.rollback()
+                flash("User not found or not pending approval.", "warning")
+                return redirect(url_for("admin_dashboard"))
+
+            if updated.get("referral_id"):
                 cur.execute("""
-                    UPDATE users 
-                    SET referral_count = referral_count + 1,
-                        amount_earned = amount_earned + 100.00,
-                        user_level = calculate_user_level(referral_count + 1)
+                    UPDATE users
+                    SET referral_count = COALESCE(referral_count, 0) + 1,
+                        amount_earned = COALESCE(amount_earned, 0) + 100.00,
+                        user_level = calculate_user_level(COALESCE(referral_count, 0) + 1)
                     WHERE public_user_id = %s
                 """, (updated["referral_id"],))
 
@@ -1230,33 +1356,28 @@ def approve_user(user_id):
 
             conn.commit()
             flash(f"User {updated['public_user_id']} approved!", "success")
-
-            if updated and updated.get("referral_id"):
+            if updated.get("referral_id"):
                 flash(f"Referral reward of {format_currency(100.00)} processed.", "info")
-
-            # Give the newly-approved account its starting wallet balance
-            # (wallet data lives in MongoDB, not Postgres - see wallet.py).
-            try:
-                wallet.init_wallet(updated["public_user_id"])
-            except Exception as e:
-                logger.error(f"Wallet init error for {updated['public_user_id']}: {e}")
-
-            # Credit the referrer's actual wallet balance with the ₹100
-            # bonus. The Postgres `amount_earned` update above is just a
-            # display stat - this is what actually moves spendable money.
-            if updated and updated.get("referral_id"):
-                try:
-                    wallet.credit_wallet(updated["referral_id"], 100.00,
-                                          reason="Referral bonus")
-                except Exception as e:
-                    logger.error(f"Referral wallet credit error for {updated['referral_id']}: {e}")
-
     except Exception as e:
         conn.rollback()
         logger.error(f"Approve user error: {e}")
         flash("Error approving user.", "danger")
+        return redirect(url_for("admin_dashboard"))
     finally:
         release_db(conn)
+
+    # Wallet data lives in MongoDB (see wallet.py). Done after the Postgres
+    # commit; failures are logged, never allowed to undo the approval.
+    try:
+        wallet.init_wallet(updated["public_user_id"], updated["full_name"])
+    except Exception as e:
+        logger.error(f"Wallet init error for {updated['public_user_id']}: {e}")
+
+    if updated.get("referral_id"):
+        try:
+            wallet.credit_wallet(updated["referral_id"], 100.00, reason="Referral bonus")
+        except Exception as e:
+            logger.error(f"Referral wallet credit error for {updated['referral_id']}: {e}")
 
     return redirect(url_for("admin_dashboard"))
 
@@ -1266,7 +1387,20 @@ def reject_user(user_id):
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("UPDATE users SET status = 'rejected', updated_at = NOW() WHERE id = %s", (user_id,))
+            # Only pending accounts can be rejected. Previously this ran
+            # against any id, so a stray POST could flip an already-approved
+            # user to 'rejected' without reversing the referrer's reward.
+            cur.execute("""
+                UPDATE users SET status = 'rejected', updated_at = NOW()
+                WHERE id = %s AND status = 'pending'
+                RETURNING public_user_id
+            """, (user_id,))
+            row = cur.fetchone()
+            if not row:
+                conn.rollback()
+                flash("User not found or not pending.", "warning")
+                return redirect(url_for("admin_dashboard"))
+            cur.execute("UPDATE referrals SET status = 'rejected' WHERE referred_id = %s", (row[0],))
             cur.execute("""
                 INSERT INTO admin_logs (admin_id, action, target_user_id, details, created_at)
                 VALUES (%s, 'reject_user', %s, %s, NOW())
@@ -1474,9 +1608,7 @@ def admin_wallets():
             payment_history = wallet.get_all_transactions(limit=200)
             for t in payment_history:
                 ts = t.get("created_at")
-                t["created_at_display"] = (
-                    datetime.fromtimestamp(ts).strftime("%d %b %Y, %I:%M %p") if ts else "-"
-                )
+                t["created_at_display"] = format_ts(ts)
         except Exception as e:
             logger.error(f"admin_wallets: payment history load error: {e}")
             payment_history = []
@@ -1666,6 +1798,7 @@ def my_network_api():
 # API
 # ═════════════════════════════════════════════════════════════
 @app.route("/api/user/check")
+@limiter.limit("30 per minute")
 def check_user():
     username = request.args.get("username", "").strip()
     email = request.args.get("email", "").strip().lower()
@@ -1695,12 +1828,35 @@ def check_user():
 # ═════════════════════════════════════════════════════════════
 @app.errorhandler(404)
 def not_found(e):
-    return redirect(url_for("login"))
+    if wants_json() or request.path.startswith("/api/"):
+        return jsonify({"error": "not_found"}), 404
+    return render_template("error.html", code=404, title="Page not found",
+                           message="That page doesn't exist or has moved."), 404
+
+@app.errorhandler(429)
+def rate_limited(e):
+    msg = "Too many attempts. Please wait a moment and try again."
+    if wants_json() or request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": msg}), 429
+    return render_template("error.html", code=429, title="Slow down",
+                           message=msg), 429
+
+@app.errorhandler(CSRFError)
+def csrf_failed(e):
+    # Expired tab / lost session. Used to surface as a bare 400 page.
+    msg = "Your session expired. Please reload the page and try again."
+    if wants_json():
+        return jsonify({"ok": False, "error": msg}), 400
+    flash(msg, "warning")
+    return redirect(request.referrer or url_for("login"))
 
 @app.errorhandler(500)
 def server_error(e):
     logger.error(f"Server error: {e}")
-    return redirect(url_for("login"))
+    if wants_json() or request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Something went wrong on our side."}), 500
+    return render_template("error.html", code=500, title="Something went wrong",
+                           message="We hit an unexpected error. Please try again."), 500
 
 # ═════════════════════════════════════════════════════════════
 # CREATE ADMIN CLI
@@ -1734,4 +1890,4 @@ def create_admin():
 
 # ─── Run ─────────────────────────────────────────────────────
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true"))

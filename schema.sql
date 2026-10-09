@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     state VARCHAR(100),
     pincode VARCHAR(10),
     external_wallet_id VARCHAR(128),
+    wallet_id_set_by_user BOOLEAN NOT NULL DEFAULT FALSE,
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255),
     google_id VARCHAR(100) UNIQUE,
@@ -84,6 +85,7 @@ CREATE TABLE IF NOT EXISTS admin_logs (
 -- INDEXES FOR PERFORMANCE
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_users_public_id ON users(public_user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);

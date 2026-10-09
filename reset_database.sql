@@ -30,6 +30,8 @@ CREATE TABLE users (
     email VARCHAR(120) UNIQUE NOT NULL,
     phone VARCHAR(20),
     address TEXT,
+    external_wallet_id VARCHAR(128),
+    wallet_id_set_by_user BOOLEAN NOT NULL DEFAULT FALSE,
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255),
     google_id VARCHAR(100) UNIQUE,
@@ -153,3 +155,5 @@ $$ LANGUAGE plpgsql;
 -- DONE. Verify with:
 -- SELECT table_name FROM information_schema.tables WHERE table_schema='public';
 -- ═══════════════════════════════════════════════════════════════
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL;

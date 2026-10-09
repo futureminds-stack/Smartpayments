@@ -5,6 +5,11 @@
 -- ═══════════════════════════════════════════════════════════════
 
 -- Step 1: Add new columns to existing users table (safe - won't break data)
+-- (wallet columns used by registration + the admin wallets page)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS external_wallet_id VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_id_set_by_user BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL;
+
 DO $$
 BEGIN
     -- public_user_id

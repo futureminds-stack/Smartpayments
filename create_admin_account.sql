@@ -4,27 +4,22 @@
 -- (or against any DB that already has the users table from schema.sql)
 --
 -- Creates/updates:
---   Username: __Chinni__admin__
---   Password: ****************  (not stored anywhere in this repo)
---   Email:    22a21a6157@swarnandhra.ac.in
+--   Username: Admin_for_BitGlory
+--   Email:    admin@bitglory.example   <-- change to your real email
 --
--- The password_hash below is a proper Werkzeug scrypt hash - it is NOT
--- plaintext and the original password is not written down here or
--- anywhere else in the codebase. Whoever created this hash knows the
--- password; share it with the admin out-of-band (not by editing this
--- file), and change it immediately after first login via the
--- forgot-password flow.
+-- password_hash is a Werkzeug scrypt hash (not plaintext). Change the
+-- password after first login via the forgot-password flow.
 -- ═══════════════════════════════════════════════════════════════
 
 INSERT INTO users (
     public_user_id, full_name, email, username, password_hash,
     status, is_admin, created_at
 ) VALUES (
-    '4D68448AA6F1A805',
-    'Chinni Admin',
-    '22a21a6157@swarnandhra.ac.in',
-    '__Chinni__admin__',
-    'scrypt:32768:8:1$WeKzgSU3aiKXTs2v$dec5c87cf22464a3bb1e008a42b62d65ab664788f7add695dd5ce8652bc013106e2f06bf746ebb84465941c138b78a96353b37209df09e9039fd0fc8d132e600',
+    'EC2AB53031EF37AF',
+    'Admin for BitGlory',
+    'admin@bitglory.example',
+    'Admin_for_BitGlory',
+    'scrypt:32768:8:1$mY9NNWxkpqAAu2pQ$1e8beb659253e329bd731d7be85717b9a998b59dbbed1c240ae73f959c629497490a8c08565edce3bd62b468c4af596e89c380b4c60c647c8e33886092c56830',
     'approved',
     TRUE,
     NOW()
@@ -36,4 +31,4 @@ ON CONFLICT (username) DO UPDATE SET
     is_admin = TRUE;
 
 -- Verify:
--- SELECT username, email, status, is_admin FROM users WHERE username = '__Chinni__admin__';
+-- SELECT username, email, status, is_admin FROM users WHERE username = 'Admin_for_BitGlory';

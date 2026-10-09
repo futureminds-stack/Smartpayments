@@ -1,1 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+{% block extra_css %}
+<style>
+.mini-sides { display: inline-flex; gap: 3px; vertical-align: middle; }
+.mini-sides i { width: 9px; height: 9px; border-radius: 2px; background: #2a3942; display: inline-block; }
+.mini-sides i.on { background: linear-gradient(135deg, #25d366, #00a884); box-shadow: 0 0 4px rgba(37,211,102,.6); }
+.admin-stat .num { font-size: 1.7rem; font-weight: 700; line-height: 1.1; }
+.admin-stat.warn { border-color: rgba(245,166,35,.45); }
+</style>
+{% endblock %}
 
+{% block content %}
+<nav class="navbar admin-nav">
+    <div class="container-fluid px-3 px-md-4">
+        <a class="navbar-brand fw-bold" href="{{ url_for('admin_dashboard') }}"><i class="bi bi-shield-shaded text-danger"></i> Admin Panel</a>
+        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <span class="text-muted small d-none d-md-inline"><i class="bi bi-person"></i> {{ session.full_name }}</span>
+            <a href="{{ url_for('admin_network') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-diagram-3"></i> <span class="d-none d-sm-inline">Network</span></a>
+            <a href="{{ url_for('admin_wallets') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-wallet2"></i> <span class="d-none d-sm-inline">Wallets</span></a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">User View</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-sm btn-danger" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-3 px-md-4 py-4">
+
+    {# ── Stats ── #}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-xl-2"><div class="stat-card admin-stat {{ 'warn' if stats.pending_count else '' }}"><div class="text-muted small">Pending approval</div><div class="num text-warning">{{ stats.pending_count }}</div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="stat-card admin-stat"><div class="text-muted small">Approved</div><div class="num text-success">{{ stats.approved_count }}</div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="stat-card admin-stat"><div class="text-muted small">Rejected</div><div class="num" style="color:var(--wa-danger)">{{ stats.rejected_count }}</div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="stat-card admin-stat"><div class="text-muted small">Total users</div><div class="num">{{ stats.total_count }}</div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="stat-card admin-stat"><div class="text-muted small">Joined today</div><div class="num">{{ stats.today_count }}</div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="stat-card admin-stat {{ 'warn' if stats.reset_count else '' }}"><div class="text-muted small">Reset requests</div><div class="num text-warning">{{ stats.reset_count }}</div></div></div>
+    </div>
+
+    {# ── Pending approvals ── #}
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-person-check text-warning"></i> Pending Approvals</h5>
+            <span class="badge bg-warning text-dark">{{ pending_users|length }}</span>
+        </div>
+        <div class="card-body p-0">
+            {% if pending_users %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead><tr><th>User</th><th>Contact</th><th>Referred by</th><th>Registered</th><th class="text-end">Action</th></tr></thead>
+                    <tbody>
+                    {% for u in pending_users %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="avatar avatar-sm">{{ u.full_name[0]|upper if u.full_name else '?' }}</div>
+                                <div>
+                                    <div class="fw-bold">{{ u.full_name }}</div>
+                                    <div class="text-muted small">@{{ u.username }} · <span class="font-monospace">{{ u.public_user_id }}</span></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><div class="small">{{ u.email }}</div><div class="text-muted small">{{ u.phone or '—' }}</div></td>
+                        <td>{% if u.referral_id %}<span class="font-monospace small">{{ u.referral_id }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        <td class="text-muted small">{{ u.created_at.strftime('%d %b %Y, %H:%M') if u.created_at else '—' }}</td>
+                        <td class="text-end text-nowrap">
+                            <form method="POST" action="{{ url_for('approve_user', user_id=u.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-sm btn-primary"><i class="bi bi-check2-circle"></i> Approve</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('reject_user', user_id=u.id) }}" class="d-inline js-confirm" data-confirm="Reject {{ u.full_name }}?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-sm btn-outline-light"><i class="bi bi-x-circle"></i> Reject</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted"><i class="bi bi-check2-all fs-1"></i><p class="mb-0">Nobody is waiting for approval.</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Password reset requests ── #}
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-key text-warning"></i> Password Reset Requests</h5>
+            <span class="badge bg-warning text-dark">{{ reset_requests|length }}</span>
+        </div>
+        <div class="card-body p-0">
+            {% if reset_requests %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead><tr><th>User</th><th>Email</th><th>Requested</th><th class="text-end">Action</th></tr></thead>
+                    <tbody>
+                    {% for r in reset_requests %}
+                    <tr>
+                        <td><div class="fw-bold">{{ r.full_name }}</div><div class="text-muted small">@{{ r.username }} · <span class="font-monospace">{{ r.public_user_id }}</span></div></td>
+                        <td class="small">{{ r.email }}</td>
+                        <td class="text-muted small">{{ r.requested_at.strftime('%d %b %Y, %H:%M') if r.requested_at else '—' }}</td>
+                        <td class="text-end text-nowrap">
+                            <form method="POST" action="{{ url_for('approve_reset', request_id=r.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-sm btn-primary"><i class="bi bi-envelope-check"></i> Approve &amp; compose email</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('reject_reset', request_id=r.id) }}" class="d-inline js-confirm" data-confirm="Reject this reset request?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-sm btn-outline-light"><i class="bi bi-x-circle"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">No pending reset requests.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Approved users (top 20 by referrals) ── #}
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-people text-success"></i> Top Approved Users</h5>
+            <span class="text-muted small">Top 20 by approved referrals</span>
+        </div>
+        <div class="card-body p-0">
+            {% if approved_users %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead><tr><th>User</th><th>Wallet ID</th><th>Level</th><th>Hexagon</th><th>Referrals</th><th>Earned</th><th>Approved</th></tr></thead>
+                    <tbody>
+                    {% for u in approved_users %}
+                    {% set rc = u.referral_count or 0 %}
+                    {% set filled = 6 if (rc > 0 and rc % 6 == 0) else rc % 6 %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="avatar avatar-sm">{{ u.full_name[0]|upper if u.full_name else '?' }}</div>
+                                <div><div class="fw-bold">{{ u.full_name }}</div><div class="text-muted small">{{ u.email }}</div></div>
+                            </div>
+                        </td>
+                        <td class="font-monospace small">
+                            {{ u.public_user_id }}
+                            {% if not u.wallet_id_set_by_user %}<span class="badge bg-warning text-dark" title="Auto-assigned">Auto</span>{% endif %}
+                        </td>
+                        <td><span class="badge level-badge level-{{ u.user_level or 'Starter' }}">{{ u.user_level or 'Starter' }}</span></td>
+                        <td>
+                            {% if rc == 0 %}<i class="bi bi-lock-fill text-muted" title="No referrals yet"></i>
+                            {% else %}<span class="mini-sides" title="{{ filled }}/6 sides of hexagon {{ ((rc - 1) // 6) + 1 }}">{% for i in range(6) %}<i class="{{ 'on' if i < filled else '' }}"></i>{% endfor %}</span>{% endif %}
+                        </td>
+                        <td class="fw-bold">{{ rc }}</td>
+                        <td class="text-success fw-bold">{{ format_currency(u.amount_earned or 0) }}</td>
+                        <td class="text-muted small">{{ u.approved_at.strftime('%d %b %Y') if u.approved_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">No approved users yet.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Reset history ── #}
+    <div class="card mb-5">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-clock-history text-info"></i> Password Reset History</h5></div>
+        <div class="card-body p-0">
+            {% if reset_history %}
+            <div class="table-responsive">
+                <table class="table table-dark table-hover mb-0 align-middle">
+                    <thead><tr><th>User</th><th>Status</th><th>Requested</th><th>Resolved</th><th>By</th></tr></thead>
+                    <tbody>
+                    {% for r in reset_history %}
+                    <tr>
+                        <td><div class="fw-bold">{{ r.full_name }}</div><div class="text-muted small">@{{ r.username }}</div></td>
+                        <td><span class="badge {{ 'bg-success text-dark' if r.status == 'approved' else 'bg-danger' }}">{{ r.status|capitalize }}</span></td>
+                        <td class="text-muted small">{{ r.requested_at.strftime('%d %b %Y, %H:%M') if r.requested_at else '—' }}</td>
+                        <td class="text-muted small">{{ r.resolved_at.strftime('%d %b %Y, %H:%M') if r.resolved_at else '—' }}</td>
+                        <td class="small">{{ r.resolved_by_name or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">No resolved requests yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ── Compose reset email (nothing is sent by the server) ── #}
+{% if compose_email %}
+<div class="modal fade" id="composeModal" tabindex="-1" aria-labelledby="composeTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="composeTitle"><i class="bi bi-envelope-paper text-success"></i> Compose Reset Email — {{ compose_email.recipient_name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Review it, then send it yourself — email app, SMS, WhatsApp, anything. The server sends nothing.</p>
+                <div class="mb-3">
+                    <label class="form-label">To</label>
+                    <div class="input-group"><input class="form-control compose-field" id="cmpTo" readonly value="{{ compose_email.to }}"><button type="button" class="btn btn-outline-secondary" data-copy="cmpTo"><i class="bi bi-clipboard"></i></button></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Subject</label>
+                    <div class="input-group"><input class="form-control compose-field" id="cmpSubject" readonly value="{{ compose_email.subject }}"><button type="button" class="btn btn-outline-secondary" data-copy="cmpSubject"><i class="bi bi-clipboard"></i></button></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Body</label>
+                    <textarea class="form-control compose-field" id="cmpBody" rows="8" readonly>{{ compose_email.body }}</textarea>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-copy="cmpBody"><i class="bi bi-clipboard"></i> Copy body</button>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label">Just the reset link</label>
+                    <div class="input-group"><input class="form-control compose-field font-monospace" id="cmpLink" readonly value="{{ compose_email.reset_link }}"><button type="button" class="btn btn-outline-secondary" data-copy="cmpLink"><i class="bi bi-clipboard"></i></button></div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+                <a class="btn btn-primary" id="cmpMailto" href="#"><i class="bi bi-envelope-arrow-up"></i> Open in Email App</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// confirm() prompts without inline onsubmit handlers (names stay out of JS strings)
+document.querySelectorAll("form.js-confirm").forEach((f) =>
+    f.addEventListener("submit", (e) => { if (!confirm(f.dataset.confirm || "Are you sure?")) e.preventDefault(); }));
+</script>
+{% if compose_email %}
+<script>
+(function () {
+    const val = (id) => document.getElementById(id).value;
+    document.getElementById("cmpMailto").href =
+        "mailto:" + encodeURIComponent(val("cmpTo")) +
+        "?subject=" + encodeURIComponent(val("cmpSubject")) +
+        "&body=" + encodeURIComponent(val("cmpBody"));
+    document.querySelectorAll("[data-copy]").forEach((b) =>
+        b.addEventListener("click", () => copyToClipboard(val(b.getAttribute("data-copy")))));
+    new bootstrap.Modal(document.getElementById("composeModal")).show();
+})();
+</script>
+{% endif %}
+{% endblock %}

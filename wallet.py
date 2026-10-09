@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 MONGODB_URI = os.environ.get("MONGODB_URI")
 INITIAL_BALANCE = 100.0
+MAX_TRANSFER = 100000.0  # sanity cap on a single transfer
 
 
 def wallet_address(referral_id):
@@ -128,6 +129,7 @@ def credit_wallet(referral_id, amount, reason=None, full_name=None):
     """Add money to a wallet directly (no sender) — used for rewards like
     the referral bonus. Creates the wallet with the starting balance first
     if it doesn't exist yet, then adds `amount` on top."""
+    amount = round(float(amount), 2)
     if amount <= 0:
         raise WalletError("Amount must be greater than zero.")
     db = _get_db()
@@ -166,8 +168,18 @@ def rename_wallet(old_referral_id, new_referral_id):
 
 
 def transfer(from_id, to_id, amount, from_name=None, to_name=None):
-    """Move `amount` from from_id's wallet to to_id's wallet atomically.
-    Raises WalletError for any user-facing validation failure."""
+    """Move `amount` from from_id's wallet to to_id's wallet.
+
+    Returns a dict: {"balance": <sender's new balance>, "txn_id": str,
+    "amount": float, "created_at": float}. Raises WalletError for any
+    user-facing validation failure.
+
+    Safety: the sender is debited with an atomic conditional update (so two
+    simultaneous transfers can't overdraw the wallet). If crediting the
+    recipient then fails for any reason, the sender is refunded before the
+    error is re-raised - previously the money was simply lost in that case,
+    because the debit had already been committed.
+    """
     to_id = (to_id or "").strip()
     if not to_id:
         raise WalletError("Enter a recipient Referral ID.")
@@ -178,16 +190,18 @@ def transfer(from_id, to_id, amount, from_name=None, to_name=None):
         amount = round(float(amount), 2)
     except (TypeError, ValueError):
         raise WalletError("Enter a valid amount.")
+    if amount != amount or amount in (float("inf"), float("-inf")):
+        raise WalletError("Enter a valid amount.")
     if amount <= 0:
         raise WalletError("Amount must be greater than zero.")
+    if amount > MAX_TRANSFER:
+        raise WalletError(f"A single transfer can't exceed \u20b9{MAX_TRANSFER:,.0f}.")
 
     db = _get_db()
 
     if not db.wallets.find_one({"referral_id": to_id}):
         raise WalletError("Recipient Referral ID not found.")
 
-    # Atomic conditional decrement - only succeeds if the balance is
-    # sufficient, so two simultaneous transfers can't overdraw the wallet.
     sender = db.wallets.find_one_and_update(
         {"referral_id": from_id, "balance": {"$gte": amount}},
         {"$inc": {"balance": -amount}},
@@ -196,17 +210,33 @@ def transfer(from_id, to_id, amount, from_name=None, to_name=None):
     if not sender:
         raise WalletError("Insufficient balance.")
 
-    db.wallets.update_one({"referral_id": to_id}, {"$inc": {"balance": amount}})
+    try:
+        res = db.wallets.update_one({"referral_id": to_id}, {"$inc": {"balance": amount}})
+        if res.matched_count != 1:
+            raise WalletError("Recipient Referral ID not found.")
+    except Exception:
+        # Refund the sender so a failed credit never destroys money.
+        try:
+            db.wallets.update_one({"referral_id": from_id}, {"$inc": {"balance": amount}})
+        except Exception:
+            logger.critical(f"WALLET REFUND FAILED: {amount} owed back to {from_id} (failed transfer to {to_id})")
+        raise
 
-    db.transactions.insert_one(
-        {
-            "txn_id": uuid.uuid4().hex[:12].upper(),
-            "from_id": from_id,
-            "from_name": from_name,
-            "to_id": to_id,
-            "to_name": to_name,
-            "amount": amount,
-            "created_at": time.time(),
-        }
-    )
-    return sender["balance"]
+    txn = {
+        "txn_id": uuid.uuid4().hex[:12].upper(),
+        "from_id": from_id,
+        "from_name": from_name,
+        "to_id": to_id,
+        "to_name": to_name,
+        "amount": amount,
+        "created_at": time.time(),
+    }
+    try:
+        db.transactions.insert_one(dict(txn))
+    except Exception as e:
+        # Money has already moved correctly; losing only the history row is
+        # better than reversing a completed payment.
+        logger.error(f"Transfer {txn['txn_id']} completed but history insert failed: {e}")
+
+    return {"balance": sender["balance"], "txn_id": txn["txn_id"],
+            "amount": amount, "created_at": txn["created_at"]}
