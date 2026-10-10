@@ -261,7 +261,7 @@ const HexNetwork = (function () {
         svg += `</g>`;
         if (o.status) {
             const col = STATUS_COLOR[o.status] || STATUS_COLOR.approved;
-            svg += `<polygon class="hexnet-status-ring" points="${HEXP_VERTS.map((v) => {
+            svg += `<polygon class="hexnet-status-ring" fill="none" pointer-events="none" points="${HEXP_VERTS.map((v) => {
                 const dx = v[0] - HEXP_C, dy = v[1] - HEXP_C, k = 1.17;
                 return `${(HEXP_C + dx * k).toFixed(1)},${(HEXP_C + dy * k).toFixed(1)}`;
             }).join(" ")}" stroke="${col}" opacity=".85"/>`;
@@ -282,45 +282,6 @@ const HexNetwork = (function () {
         }
         svg += `</svg>`;
         return svg;
-    }
-
-    /**
-     * The user's own progression as a row of hexagons: finished ones (solid),
-     * the one currently being filled (large, pulsing), then two locked ones.
-     * `approved` / `pending` are the counts of direct referrals by status.
-     */
-    function hexChainHTML(approved, pending) {
-        approved = Math.max(0, approved | 0); pending = Math.max(0, pending | 0);
-        const completed = Math.floor(approved / 6);
-        const curFilled = approved % 6;
-        const curPending = Math.min(pending, 6 - curFilled);
-        const startDone = Math.max(0, completed - 2);
-
-        const cell = (k, kind) => {
-            let svg, cap, sub, cls = "hexp";
-            if (kind === "done") {
-                svg = hexProgressSVG({ filled: 6, label: `Hexagon ${k + 1}` });
-                cap = "Completed"; sub = "6 / 6";
-            } else if (kind === "current") {
-                svg = hexProgressSVG({ filled: curFilled, pending: curPending, active: true, label: `Hexagon ${k + 1}` });
-                cls += " hexp-current";
-                cap = curFilled === 0 && curPending === 0 ? "Refer someone to unlock" : "In progress";
-                sub = `${curFilled} / 6${curPending ? ` · ${curPending} pending` : ""}`;
-            } else {
-                svg = hexProgressSVG({ filled: 0, label: `Hexagon ${k + 1}` });
-                cap = "Locked"; sub = "Fill the previous one";
-            }
-            return `<div class="${cls}">${svg}<div class="hexp-caption"><strong>Hexagon ${k + 1}</strong>${cap}<br>${sub}</div></div>`;
-        };
-
-        let html = `<div class="hexchain">`;
-        if (startDone > 0) html += `<div class="hexchain-more">+${startDone} more<br>completed</div>`;
-        for (let k = startDone; k < completed; k++) html += cell(k, "done");
-        html += cell(completed, "current");
-        html += cell(completed + 1, "locked");
-        html += cell(completed + 2, "locked");
-        html += `</div>`;
-        return html;
     }
 
     const SLOTS_PER_LEVEL = 5;
@@ -600,6 +561,6 @@ const HexNetwork = (function () {
         esc, initials, constellationSVG, emptySVG, attachInteractivity, nodeMap, legendHTML, statusLegendHTML,
         levelGridHTML, levelNodeMap, attachLevelGridAddSlots,
         orgChartForestHTML, forestNodeMap, soloPanelHTML, soloNodeMap,
-        hexSidesSVG, hexEdgeMidpoints, hexProgressSVG, hexChainHTML,
+        hexSidesSVG, hexEdgeMidpoints, hexProgressSVG,
     };
 })();

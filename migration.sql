@@ -8,6 +8,9 @@
 -- (wallet columns used by registration + the admin wallets page)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS external_wallet_id VARCHAR(128);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_id_set_by_user BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_pin_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_failed_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_locked_until TIMESTAMPTZ;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL;
 
 DO $$

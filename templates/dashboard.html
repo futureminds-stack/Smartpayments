@@ -49,6 +49,7 @@
             <div class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-send" data-open-pay><i class="bi bi-send-fill"></i> Send money</button>
                 <button type="button" class="btn btn-ghost" onclick="copyToClipboard('{{ user.public_user_id }}')"><i class="bi bi-qr-code"></i> Copy my Wallet ID</button>
+                <button type="button" class="btn btn-ghost" data-open-pin-settings><i class="bi bi-key-fill"></i> <span data-pin-label>{{ 'Change PIN' if has_pin else 'Set PIN' }}</span></button>
             </div>
         </div>
         {% elif wallet_enabled %}
@@ -136,19 +137,13 @@
             </div>
         </div>
         <div class="card-body">
-            <div id="hexChainWrap">
-                <div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-success me-2"></div>Loading…</div>
-            </div>
-            <div class="hexchain-summary mt-2" id="hexChainSummary"></div>
-            <div class="hex-legend mt-3">
+            <div class="hex-legend mb-3">
                 <span><i class="l-on"></i>Approved referral = filled side</span>
                 <span><i class="l-pend"></i>Waiting for admin</span>
                 <span><i class="bi bi-lock-fill l-lock"></i>Locked – nobody referred yet</span>
             </div>
 
-            <hr class="border-secondary my-4">
-
-            <h6 class="fw-bold mb-1">Your network, level by level</h6>
+            <h6 class="fw-bold mb-1 mt-2">Your network, level by level</h6>
             <p class="text-muted small mb-3">Every hexagon below is one real person. Their sides fill as <em>their</em> referrals get approved, a full hexagon needs 6, and a padlock means they haven't referred anyone yet. Each of the 5 levels shows up to 5 people; tap a padlock slot to copy your invite link.</p>
             <div class="d-flex flex-wrap gap-3 mb-3" id="myNetworkLegend"></div>
             <div class="hexnet-mini-wrap" id="myNetworkWidget">
@@ -286,7 +281,51 @@
                 <div class="text-muted small mt-1">From your wallet · instant · no fees</div>
             </div>
             <div class="pay-err" id="payErr2" role="alert"></div>
-            <button type="button" class="pay-swipe" id="payConfirm">Pay</button>
+            <button type="button" class="pay-swipe" id="payConfirm">Continue to PIN</button>
+        </div>
+
+        {# step 3: enter PIN #}
+        <div id="payStep3" hidden>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <button type="button" class="btn btn-sm btn-outline-light" id="payPinBack"><i class="bi bi-arrow-left"></i></button>
+                <h5 class="mb-0 fw-bold"><i class="bi bi-shield-lock-fill text-success"></i> Enter PIN</h5>
+                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            </div>
+            <div class="text-center text-muted small mb-3" id="payPinFor"></div>
+            <div class="pin-dots" id="pinDotsEnter" aria-label="PIN entry"></div>
+            <div class="pay-err" id="payErr3" role="alert"></div>
+            <div class="pin-pad" id="pinPadEnter"></div>
+            <div class="text-center mt-2"><a href="#" id="payForgotPin" class="small">Forgot PIN?</a></div>
+        </div>
+
+        {# step 4: create PIN (first payment) #}
+        <div id="payStep4" hidden>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span style="width:32px"></span>
+                <h5 class="mb-0 fw-bold" id="payPinTitle">Create payment PIN</h5>
+                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            </div>
+            <div class="text-center text-muted small mb-3" id="payPinSub"></div>
+            <div class="pin-dots" id="pinDotsCreate" aria-label="New PIN"></div>
+            <div class="pay-err" id="payErr4" role="alert"></div>
+            <div class="pin-pad" id="pinPadCreate"></div>
+        </div>
+
+        {# step 5: change / reset PIN #}
+        <div id="payStep5" hidden>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span style="width:32px"></span>
+                <h5 class="mb-0 fw-bold"><i class="bi bi-key-fill text-success"></i> Change PIN</h5>
+                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            </div>
+            <label class="form-label" for="pinCurrent" id="pinCurrentHint">Current PIN — or your account password if you forgot it.</label>
+            <input type="password" id="pinCurrent" class="form-control mb-3" autocomplete="current-password">
+            <label class="form-label" for="pinNew">New 4-digit PIN</label>
+            <input type="password" id="pinNew" class="form-control mb-3 font-monospace" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off">
+            <label class="form-label" for="pinNew2">Confirm new PIN</label>
+            <input type="password" id="pinNew2" class="form-control font-monospace" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off">
+            <div class="pay-err" id="payPinErr" role="alert"></div>
+            <button type="button" class="pay-swipe" id="payPinSave"><span style="position:relative;z-index:1">Save PIN</span></button>
         </div>
     </div>
 </div>
@@ -332,43 +371,22 @@
 <script src="{{ url_for('static', filename='js/payments.js') }}"></script>
 <script>
 (function () {
-    const chainWrap = document.getElementById("hexChainWrap");
-    const chainSummary = document.getElementById("hexChainSummary");
     const levelsWrap = document.getElementById("myNetworkWidget");
     const legendWrap = document.getElementById("myNetworkLegend");
     const pendingEl = document.getElementById("totalPendingCount");
     const approvedEl = document.getElementById("approvedCount");
     const REF_LINK = {{ ref_link|tojson }};
-    let lastChainKey = null, lastLevelsKey = null;
+    let lastLevelsKey = null;
 
     if (legendWrap) legendWrap.innerHTML = HexNetwork.statusLegendHTML();
 
-    // First paint straight from the server-rendered count (no waiting on fetch)
-    function renderChain(approved, pending) {
-        const key = approved + ":" + pending;
-        if (key === lastChainKey) return;
-        lastChainKey = key;
-        chainWrap.innerHTML = HexNetwork.hexChainHTML(approved, pending);
-        const completed = Math.floor(approved / 6);
-        const left = 6 - (approved % 6);
-        chainSummary.innerHTML = approved === 0 && pending === 0
-            ? "Get your first referral approved to start filling your hexagon."
-            : `<strong>${approved}</strong> approved referral${approved === 1 ? "" : "s"} · ` +
-              `<strong>${completed}</strong> hexagon${completed === 1 ? "" : "s"} completed · ` +
-              `<span class="text-success">${left} more to ${completed ? "complete the next one" : "complete your first"}</span>` +
-              (pending ? ` · <span style="color:var(--wa-amber)">${pending} awaiting admin approval</span>` : "");
-        if (approvedEl) approvedEl.textContent = approved;
-    }
-    renderChain({{ user.referral_count or 0 }}, 0);
-
+    // Keep the "Approved Referrals" stat live
     function loadChain() {
         return fetch("{{ url_for('my_network_api') }}", { credentials: "same-origin" })
             .then((r) => r.json())
             .then((data) => {
-                if (data.error || !data.center) return;
-                const sats = data.satellites || [];
-                renderChain(sats.filter((s) => s.status === "approved").length,
-                            sats.filter((s) => s.status === "pending").length);
+                if (data.error || !data.satellites) return;
+                if (approvedEl) approvedEl.textContent = data.satellites.filter((s) => s.status === "approved").length;
             }).catch(() => {});
     }
 
@@ -411,6 +429,8 @@
     WalletPay.init({
         transferUrl: "{{ url_for('wallet_transfer') }}",
         recipientUrl: "{{ url_for('wallet_recipient') }}",
+        pinSetUrl: "{{ url_for('wallet_pin_set') }}",
+        hasPin: {{ 'true' if has_pin else 'false' }},
         myId: {{ user.public_user_id|tojson }},
         onSuccess: function (d) {
             // live-update balance + add the new "sent" bubble, no reload needed

@@ -599,25 +599,24 @@ a { text-decoration: none; }
 .hexp-caption strong { color: var(--wa-text); display: block; font-size: .78rem; }
 .hexp-hourglass { fill: var(--wa-amber); }
 
-.hexchain { display: flex; flex-wrap: wrap; gap: 1.25rem 1.6rem; justify-content: center; align-items: flex-end; padding: .5rem 0; }
-.hexchain .hexp { width: 112px; }
-.hexchain .hexp.hexp-current { width: 156px; }
-.hexchain-more { align-self: center; font-size: .8rem; color: var(--wa-muted); }
-.hexchain-summary { text-align: center; font-size: .86rem; color: var(--wa-text); }
-
 /* ── Network levels grid (each hexagon = one real person) ── */
 .hexnet-slot { cursor: pointer; outline: none; transition: transform .2s ease, filter .2s ease; }
 .hexnet-slot .hexp { width: 100%; }
 .hexnet-slot:hover, .hexnet-slot:focus-visible { transform: scale(1.18); z-index: 2; position: relative; filter: brightness(1.15); }
+.hexnet-status-ring { fill: none; stroke-width: 2.4; pointer-events: none; }
 .hexnet-slot-empty { opacity: .6; }
 .hexnet-slot-empty:hover { opacity: 1; }
 .hexnet-level-slots { align-items: center; }
-.hexnet-level-slots .hexnet-slot { width: 52px; }
-.hexnet-level-active .hexnet-slot { width: 64px; }
-.hexnet-level-locked .hexnet-slot { width: 40px; }
+.hexnet-level-slots { gap: 1.1rem; }
+.hexnet-level-slots .hexnet-slot { width: 104px; }
+.hexnet-level-active .hexnet-slot { width: 112px; }
+.hexnet-level-locked .hexnet-slot { width: 104px; }
 .hexnet-level-locked { opacity: .6; }
-.hexnet-status-ring { fill: none; stroke-width: 2.4; }
-@media (max-width: 576px) { .hexnet-level-slots .hexnet-slot { width: 44px; } .hexnet-level-active .hexnet-slot { width: 52px; } }
+.hexnet-levels-grid { gap: 1.4rem; }
+.hexnet-level-label { flex: 0 0 120px; }
+.hexnet-level-num { font-size: 1rem; }
+@media (max-width: 992px) { .hexnet-level-slots .hexnet-slot, .hexnet-level-active .hexnet-slot, .hexnet-level-locked .hexnet-slot { width: 84px; } }
+@media (max-width: 576px) { .hexnet-level-slots { gap: .5rem; } .hexnet-level-slots .hexnet-slot, .hexnet-level-active .hexnet-slot, .hexnet-level-locked .hexnet-slot { width: 56px; } .hexnet-level-label { flex-basis: 100%; } }
 
 /* ═══════════════════════════════════════════════════════════
    Payments — PhonePe / Google Pay style flow
@@ -745,3 +744,16 @@ body.pay-open { overflow: hidden; }
 .hex-legend .l-pend { background: repeating-linear-gradient(90deg, #f5a623 0 4px, transparent 4px 7px); }
 .hex-legend .l-lock { background: none; width: auto; height: auto; margin-right: .3rem; color: #6b7c85; }
 .chat-scroll { max-height: 300px; overflow-y: auto; }
+
+/* ── Payment PIN keypad ── */
+.pin-dots { display: flex; justify-content: center; gap: 1rem; margin: .5rem 0 .25rem; }
+.pin-dots span { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #4a5d68; transition: background .12s ease, transform .12s ease, border-color .12s ease; }
+.pin-dots span.on { background: var(--wa-green-bright); border-color: var(--wa-green-bright); transform: scale(1.12); }
+.pin-dots.shake { animation: pinShake .42s ease; }
+@keyframes pinShake { 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(3px); } }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; max-width: 300px; margin: .4rem auto 0; }
+.pin-pad.disabled { opacity: .4; pointer-events: none; }
+.pin-key { height: 56px; border: 0; border-radius: 14px; background: var(--wa-input); color: var(--wa-text); font-size: 1.45rem; font-weight: 600; transition: background .12s ease, transform .08s ease; }
+.pin-key:hover { background: #34454f; }
+.pin-key:active { transform: scale(.94); background: var(--wa-green-dark); }
+.pin-key-del { font-size: 1.2rem; background: transparent; }

@@ -45,7 +45,8 @@ Setup:
 4. Copy the `mongodb+srv://...` connection string, make sure it includes a database name in the path (e.g. `.../referral_platform?retryWrites=true&w=majority`), and set it as `MONGODB_URI` in Render's environment variables.
 
 Once configured:
-- Every account gets an initial balance of ₹100 the moment an admin approves it.
+- Every account gets a joining bonus of ₹30 (its starting balance) the moment an admin approves it.
+- Payments are approved with a 4-digit **payment PIN** (created on a user's first payment; 5 wrong tries lock payments for 15 minutes).
 - Users can send money to any other account by entering the recipient's **Referral ID** on their dashboard.
 - Transfers are atomic (a conditional balance check prevents overdrafts under concurrent transfers) and every transfer is logged with a transaction ID, visible in "Recent Wallet Activity" on both ends.
 

@@ -32,7 +32,7 @@ from pymongo.errors import PyMongoError
 logger = logging.getLogger(__name__)
 
 MONGODB_URI = os.environ.get("MONGODB_URI")
-INITIAL_BALANCE = 100.0
+INITIAL_BALANCE = 30.0  # joining bonus: starting balance of every new wallet
 MAX_TRANSFER = 100000.0  # sanity cap on a single transfer
 
 

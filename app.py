@@ -1,5 +1,7 @@
 import os
 import secrets
+import hmac
+import hashlib
 import re
 import logging
 import traceback
@@ -198,6 +200,9 @@ def ensure_schema():
     stmts = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_id_set_by_user BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS external_wallet_id VARCHAR(128)",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_pin_hash TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_failed_attempts INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_locked_until TIMESTAMPTZ",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_external_wallet_unique "
         "ON users (external_wallet_id) WHERE external_wallet_id IS NOT NULL",
     ]
@@ -869,7 +874,8 @@ def dashboard():
                                    wallet=my_wallet,
                                    wallet_txns=wallet_txns,
                                    wallet_id_display=wallet.wallet_address(user["public_user_id"]),
-                                   wallet_enabled=wallet.wallet_enabled())
+                                   wallet_enabled=wallet.wallet_enabled(),
+                                   has_pin=bool(user.get("payment_pin_hash")))
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
         flash("Error loading dashboard.", "danger")
@@ -947,6 +953,133 @@ def edit_profile():
 # ═════════════════════════════════════════════════════════════
 # WALLET (balances + transfers live in MongoDB - see wallet.py)
 # ═════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════
+# PAYMENT PIN
+# A 4-digit PIN approves every payment (like UPI). Only a hash is stored,
+# and 5 wrong tries lock payments for 15 minutes (enforced in the database,
+# so it can't be bypassed by opening more tabs or restarting the server).
+# ═════════════════════════════════════════════════════════════
+PIN_MAX_ATTEMPTS = 5
+PIN_LOCK_MINUTES = 15
+
+def _pin_material(user_id, pin):
+    """HMAC the PIN with the server secret before hashing. A bare 4-digit
+    hash could be cracked in milliseconds if the database ever leaked; with
+    the secret mixed in it can't be brute-forced from the database alone.
+    (Consequence: changing SECRET_KEY invalidates all PINs - users then
+    reset them with their account password.)"""
+    return hmac.new(app.secret_key.encode(), f"{user_id}:{pin}".encode(), hashlib.sha256).hexdigest()
+
+def _weak_pin_error(pin):
+    if not re.fullmatch(r"\d{4}", pin or ""):
+        return "PIN must be exactly 4 digits."
+    digits = [int(c) for c in pin]
+    steps = {b - a for a, b in zip(digits, digits[1:])}
+    if len(set(digits)) == 1 or steps == {1} or steps == {-1}:
+        return "That PIN is too easy to guess (like 1111 or 1234). Choose another."
+    return None
+
+def verify_pin(conn, user_id, pin):
+    """Check a payment PIN. Returns (ok, code, message).
+
+    code is one of: None, 'pin_not_set', 'pin_invalid', 'pin_locked', 'auth'.
+    Wrong attempts are counted and locked inside one row-locked transaction.
+    """
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("""
+            SELECT payment_pin_hash,
+                   COALESCE(pin_failed_attempts, 0) AS attempts,
+                   (pin_locked_until IS NOT NULL AND pin_locked_until > NOW()) AS locked,
+                   GREATEST(1, CEIL(EXTRACT(EPOCH FROM (pin_locked_until - NOW())) / 60)) AS mins
+            FROM users WHERE id = %s FOR UPDATE
+        """, (user_id,))
+        row = cur.fetchone()
+        if not row:
+            conn.rollback()
+            return False, "auth", "Please log in again."
+        if not row["payment_pin_hash"]:
+            conn.rollback()
+            return False, "pin_not_set", "Create your payment PIN first."
+        if row["locked"]:
+            conn.rollback()
+            mins = int(row["mins"] or PIN_LOCK_MINUTES)
+            return False, "pin_locked", f"Too many wrong attempts. Try again in {mins} minute{'s' if mins != 1 else ''}."
+        if not re.fullmatch(r"\d{4}", pin or ""):
+            conn.rollback()
+            return False, "pin_invalid", "Enter your 4-digit PIN."
+
+        if check_password_hash(row["payment_pin_hash"], _pin_material(user_id, pin)):
+            if row["attempts"]:
+                cur.execute("UPDATE users SET pin_failed_attempts = 0, pin_locked_until = NULL WHERE id = %s", (user_id,))
+            conn.commit()
+            return True, None, None
+
+        attempts = row["attempts"] + 1
+        if attempts >= PIN_MAX_ATTEMPTS:
+            cur.execute("""UPDATE users SET pin_failed_attempts = 0,
+                           pin_locked_until = NOW() + (%s || ' minutes')::interval WHERE id = %s""",
+                        (str(PIN_LOCK_MINUTES), user_id))
+            conn.commit()
+            return False, "pin_locked", f"Too many wrong attempts. Payments are locked for {PIN_LOCK_MINUTES} minutes."
+        cur.execute("UPDATE users SET pin_failed_attempts = %s WHERE id = %s", (attempts, user_id))
+        conn.commit()
+        left = PIN_MAX_ATTEMPTS - attempts
+        return False, "pin_invalid", f"Incorrect PIN. {left} attempt{'s' if left != 1 else ''} left."
+
+@app.route("/wallet/pin/set", methods=["POST"])
+@limiter.limit("10 per hour")
+def wallet_pin_set():
+    """Create the payment PIN, or change it.
+
+    Changing/resetting requires proof it's really the owner: either the
+    current PIN, or (if the PIN is forgotten/locked) the account password.
+    """
+    if "user_id" not in session:
+        return jsonify({"ok": False, "error": "Please log in again."}), 401
+
+    new_pin = request.form.get("new_pin", "").strip()
+    confirm = request.form.get("confirm_pin", "").strip()
+    current = request.form.get("current", "")
+
+    err = _weak_pin_error(new_pin)
+    if err:
+        return jsonify({"ok": False, "error": err, "code": "pin_weak"}), 400
+    if new_pin != confirm:
+        return jsonify({"ok": False, "error": "The two PINs don't match.", "code": "pin_mismatch"}), 400
+
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT payment_pin_hash, password_hash FROM users WHERE id = %s", (session["user_id"],))
+            row = cur.fetchone()
+        if not row:
+            session.clear()
+            return jsonify({"ok": False, "error": "Please log in again."}), 401
+
+        if row["payment_pin_hash"]:
+            if re.fullmatch(r"\d{4}", current or ""):
+                ok, code, msg = verify_pin(conn, session["user_id"], current)
+                if not ok:
+                    return jsonify({"ok": False, "error": msg, "code": code}), 403
+            elif current and check_password_hash(row["password_hash"], current):
+                pass  # forgot-PIN path: account password is accepted
+            else:
+                return jsonify({"ok": False, "error": "Enter your current PIN, or your account password if you forgot it.",
+                                "code": "auth_required"}), 403
+
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE users SET payment_pin_hash = %s, pin_failed_attempts = 0,
+                           pin_locked_until = NULL, updated_at = NOW() WHERE id = %s""",
+                        (generate_password_hash(_pin_material(session["user_id"], new_pin)), session["user_id"]))
+            conn.commit()
+        return jsonify({"ok": True, "message": "Payment PIN saved."})
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"PIN set error: {e}")
+        return jsonify({"ok": False, "error": "Could not save your PIN. Please try again."}), 500
+    finally:
+        release_db(conn)
+
 def _lookup_recipient(cur, to_ref_id):
     """Approved account for a Referral ID, or None."""
     if not re.fullmatch(r"[A-Za-z0-9]{16}", to_ref_id or ""):
@@ -983,9 +1116,12 @@ def wallet_recipient():
 def wallet_transfer():
     as_json = wants_json()
 
-    def fail(message, status=400, category="warning"):
+    def fail(message, status=400, category="warning", code=None):
         if as_json:
-            return jsonify({"ok": False, "error": message}), status
+            body = {"ok": False, "error": message}
+            if code:
+                body["code"] = code
+            return jsonify(body), status
         flash(message, category)
         return redirect(url_for("dashboard"))
 
@@ -1002,6 +1138,15 @@ def wallet_transfer():
 
     conn = get_db()
     try:
+        # Payment PIN is checked first, before anything about the payment is
+        # looked up or any money moves.
+        pin_ok, pin_code, pin_msg = verify_pin(conn, session["user_id"], request.form.get("pin", ""))
+        if not pin_ok:
+            if pin_code == "auth":
+                session.clear()
+                return fail(pin_msg, 401, code=pin_code)
+            return fail(pin_msg, 423 if pin_code == "pin_locked" else 403, code=pin_code)
+
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("SELECT public_user_id, full_name FROM users WHERE id = %s",
                         (session["user_id"],))
