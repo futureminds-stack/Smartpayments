@@ -609,14 +609,13 @@ a { text-decoration: none; }
 .hexnet-level-slots { align-items: center; }
 .hexnet-level-slots { gap: 1.1rem; }
 .hexnet-level-slots .hexnet-slot { width: 104px; }
-.hexnet-level-active .hexnet-slot { width: 112px; }
-.hexnet-level-locked .hexnet-slot { width: 104px; }
-.hexnet-level-locked { opacity: .6; }
+.hexnet-level-notstarted { opacity: .62; }
+.hexnet-level-complete .hexnet-level-num { color: var(--wa-green-bright); }
 .hexnet-levels-grid { gap: 1.4rem; }
 .hexnet-level-label { flex: 0 0 120px; }
 .hexnet-level-num { font-size: 1rem; }
-@media (max-width: 992px) { .hexnet-level-slots .hexnet-slot, .hexnet-level-active .hexnet-slot, .hexnet-level-locked .hexnet-slot { width: 84px; } }
-@media (max-width: 576px) { .hexnet-level-slots { gap: .5rem; } .hexnet-level-slots .hexnet-slot, .hexnet-level-active .hexnet-slot, .hexnet-level-locked .hexnet-slot { width: 56px; } .hexnet-level-label { flex-basis: 100%; } }
+@media (max-width: 992px) { .hexnet-level-slots .hexnet-slot { width: 84px; } }
+@media (max-width: 576px) { .hexnet-level-slots { gap: .5rem; } .hexnet-level-slots .hexnet-slot { width: 56px; } .hexnet-level-label { flex-basis: 100%; } }
 
 /* ═══════════════════════════════════════════════════════════
    Payments — PhonePe / Google Pay style flow
@@ -757,3 +756,10 @@ body.pay-open { overflow: hidden; }
 .pin-key:hover { background: #34454f; }
 .pin-key:active { transform: scale(.94); background: var(--wa-green-dark); }
 .pin-key-del { font-size: 1.2rem; background: transparent; }
+
+/* ── Network graph polish ── */
+.hexnet-tree-name { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+.hexnet-solo-dot .hexnet-tree-name { max-width: 190px; }
+.hexnet-hex-edge-on { stroke: var(--wa-green-bright); stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(37,211,102,.7)); }
+.hexnet-hex-sub { fill: var(--wa-muted); font-size: 11px; text-anchor: middle; }
+.hexnet-focus-svg-wrap { overflow: auto; }

@@ -1443,7 +1443,34 @@ def admin_dashboard():
             """)
             reset_history = cur.fetchall()
 
+            # Level completion (5 levels x 5 hexagons x 6 sides). The table
+            # shows it for the top users; the "Level completions" card scans
+            # everyone who has a downline (capped) so completions of any
+            # user are reflected, not just those in the top 20.
+            level_progress, completions = {}, []
+            try:
+                cur.execute("""
+                    SELECT public_user_id, full_name, email FROM users
+                    WHERE status = 'approved' AND is_admin = FALSE
+                      AND EXISTS (SELECT 1 FROM users c WHERE c.referral_id = users.public_user_id)
+                    ORDER BY referral_count DESC NULLS LAST LIMIT 500
+                """)
+                people = cur.fetchall()
+                ids = list({u["public_user_id"] for u in people} | {u["public_user_id"] for u in approved_users})
+                level_progress = level_progress_for(cur, ids)
+                for u in people:
+                    done = [l["depth"] for l in level_progress[u["public_user_id"]] if l["complete"]]
+                    if done:
+                        completions.append({"full_name": u["full_name"], "email": u["email"],
+                                            "public_user_id": u["public_user_id"], "levels": done})
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"Admin level progress error: {e}")
+
             return render_template("admin.html",
+                                   level_progress=level_progress,
+                                   completions=completions,
+                                   level_capacity=LEVEL_CAPACITY,
                                    stats=stats,
                                    pending_users=pending_users,
                                    approved_users=approved_users,
@@ -1668,6 +1695,53 @@ def _node(row, has_children=False):
         "joined": row["created_at"].strftime("%d %b %Y") if row.get("created_at") else None,
         "hasChildren": bool(has_children),
     }
+
+# ── Level hexagons ───────────────────────────────────────────
+# A level (depth 1-5 of someone's downline) has 5 hexagons of 6 sides.
+# Every approved person at that depth fills the next free side; 6 fill a
+# hexagon, and 5 full hexagons (30 approved people) complete the level.
+HEX_SIDES = 6
+LEVEL_HEXAGONS = 5
+LEVEL_CAPACITY = HEX_SIDES * LEVEL_HEXAGONS   # 30
+LEVEL_DEPTH = 5
+
+def level_progress_for(cur, public_ids):
+    """For each user id, the downline progress at depth 1..5.
+
+    Returns {public_id: [ {depth, approved, pending, hexes_done, complete}, x5 ]}.
+    One recursive query for all ids at once (depth-limited, so it can't
+    loop forever even on bad data).
+    """
+    out = {pid: [{"depth": d, "approved": 0, "pending": 0, "hexes_done": 0, "complete": False}
+                 for d in range(1, LEVEL_DEPTH + 1)] for pid in public_ids}
+    if not public_ids:
+        return out
+    cur.execute("""
+        WITH RECURSIVE tree AS (
+            SELECT u.public_user_id AS root, c.public_user_id AS node, 1 AS depth, c.status
+            FROM users u
+            JOIN users c ON c.referral_id = u.public_user_id AND c.is_admin = FALSE
+            WHERE u.public_user_id = ANY(%s)
+          UNION ALL
+            SELECT t.root, c.public_user_id, t.depth + 1, c.status
+            FROM tree t
+            JOIN users c ON c.referral_id = t.node AND c.is_admin = FALSE
+            WHERE t.depth < %s
+        )
+        SELECT root, depth,
+               COUNT(*) FILTER (WHERE status = 'approved') AS approved,
+               COUNT(*) FILTER (WHERE status = 'pending') AS pending
+        FROM tree GROUP BY root, depth
+    """, (list(public_ids), LEVEL_DEPTH))
+    for r in cur.fetchall():
+        lvl = out[r["root"]][r["depth"] - 1]
+        lvl["approved"] = int(r["approved"])
+        lvl["pending"] = int(r["pending"])
+    for levels in out.values():
+        for lvl in levels:
+            lvl["hexes_done"] = min(LEVEL_HEXAGONS, lvl["approved"] // HEX_SIDES)
+            lvl["complete"] = lvl["approved"] >= LEVEL_CAPACITY
+    return out
 
 def _children_map(cur, public_ids):
     """One query to fetch the direct referrals of every id in public_ids,
@@ -1894,15 +1968,17 @@ def my_network_levels_api():
             total_pending = 0
             for depth in range(1, 6):
                 if not current_ids:
-                    levels.append({"depth": depth, "total": 0, "pending": 0, "people": []})
+                    levels.append({"depth": depth, "total": 0, "approved": 0, "pending": 0, "people": []})
                     continue
                 kids_map = _children_map(cur, current_ids)
                 flat = []
                 for pid in current_ids:
                     flat.extend(kids_map.get(pid, []))
                 pending_here = sum(1 for n in flat if n["status"] == "pending")
+                approved_here = sum(1 for n in flat if n["status"] == "approved")
                 total_pending += pending_here
-                levels.append({"depth": depth, "total": len(flat), "pending": pending_here, "people": flat[:5]})
+                levels.append({"depth": depth, "total": len(flat), "approved": approved_here,
+                               "pending": pending_here, "people": flat[:5]})
                 current_ids = [n["id"] for n in flat]
 
             return jsonify({"levels": levels, "totalPending": total_pending})

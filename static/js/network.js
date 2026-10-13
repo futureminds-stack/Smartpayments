@@ -45,6 +45,25 @@ const HexNetwork = (function () {
         return pts.join(" ");
     }
 
+    /** Lit sides on a flat-top hexagon: approved referrals fill the sides of the hexagon being filled; each 6 completes one and the count carries on. */
+    function hexSideProgress(cx, cy, r, approved) {
+        if (approved <= 0) return "";
+        const lit = approved % 6;               // sides on the hexagon currently being filled
+        const full = Math.floor(approved / 6);  // hexagons already completed
+        const pts = [];
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 180) * (60 * i);
+            pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+        }
+        let out = "";
+        for (let i = 0; i < lit; i++) {
+            const a = pts[i], b = pts[(i + 1) % 6];
+            out += `<line class="hexnet-hex-edge-on" x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}"/>`;
+        }
+        out += `<text x="${cx}" y="${(cy + r + 20).toFixed(1)}" class="hexnet-hex-sub">${full ? `${full} hexagon${full === 1 ? "" : "s"} full \u00b7 ${lit}/6 on the next` : `${lit}/6 sides`}</text>`;
+        return out;
+    }
+
     function satellitePos(cx, cy, dist, i, n) {
         const a = (Math.PI / 180) * (-90 + (360 / Math.max(n, 1)) * i);
         return { x: cx + dist * Math.cos(a), y: cy + dist * Math.sin(a) };
@@ -59,9 +78,20 @@ const HexNetwork = (function () {
             w: 280, h: 240, hexR: 40, spokeLen: 84, satR: 15,
             interactive: true, showSatLabels: false,
         }, opts);
+        const n = satellites.length;
+        // Many referrals used to be squeezed onto a fixed ring, so dots and
+        // labels overlapped. Grow the ring (and canvas) so each dot keeps room.
+        const needR = Math.ceil((n * (opts.satR * 2 + (opts.showSatLabels ? 30 : 8))) / (2 * Math.PI));
+        opts.spokeLen = Math.max(opts.spokeLen, needR);
+        if (opts.showSatLabels) {
+            opts.w = Math.max(opts.w, 2 * (opts.spokeLen + opts.satR + 120));
+            opts.h = Math.max(opts.h, 2 * (opts.spokeLen + opts.satR + 40));
+        } else {
+            opts.w = Math.max(opts.w, 2 * (opts.spokeLen + opts.satR + 12));
+            opts.h = Math.max(opts.h, 2 * (opts.spokeLen + opts.satR + 12));
+        }
         const cx = opts.w / 2, cy = opts.h / 2;
         const lvlColor = LEVEL_COLOR[center.level] || LEVEL_COLOR.Starter;
-        const n = satellites.length;
 
         let svg = `<svg viewBox="0 0 ${opts.w} ${opts.h}" class="hexnet-svg" preserveAspectRatio="xMidYMid meet">`;
 
@@ -72,6 +102,7 @@ const HexNetwork = (function () {
 
         svg += `<g class="hexnet-node hexnet-hex" data-id="${esc(center.id)}" ${opts.interactive ? 'tabindex="0" role="button"' : ""} aria-label="${esc(center.name)}">
             <polygon points="${hexPoints(cx, cy, opts.hexR)}" class="hexnet-hexagon" style="--lvl:${lvlColor}"/>
+            ${hexSideProgress(cx, cy, opts.hexR, satellites.filter((x) => x.status === "approved").length)}
             <text x="${cx}" y="${cy}" class="hexnet-hex-label">${esc(shortLabel(center.name))}</text>
         </g>`;
 
@@ -288,66 +319,62 @@ const HexNetwork = (function () {
     const LEVEL_COUNT = 5;
 
     /**
-     * Build the 5-levels x 5-hexagons grid. `levels` is an array of
-     * { depth, total, people } from /api/my-network-levels, where `people`
-     * is the real, individual referred users at that depth (never an
-     * aggregate/graph node - one hexagon is always exactly one person).
-     * Unfilled slots render as dull placeholder hexagons; filled slots are
-     * highlighted and colored by that person's referral status.
+     * Level grid: 5 levels (depth of the user's downline), each with 5
+     * hexagons of 6 sides. The level's APPROVED count fills the sides in
+     * order - 1st to 6th approved person lights hexagon 1, the 7th starts
+     * hexagon 2, and so on; 5 full hexagons (30 people) complete the level.
+     * Waiting-for-admin people show as amber dashed sides right after the
+     * lit ones. A hexagon with nothing in it yet shows a padlock.
      *
-     * Progression: the first level that isn't completely filled (5/5) is
-     * the "active" level and renders larger/brighter to draw the eye to
-     * where to focus next. Levels before it that are already full render
-     * as "completed" (normal size, checkmarked). Levels after it are
-     * "locked" (smaller/dimmer) until the level ahead of them fills up.
+     * `levels[i]` = { depth, approved, pending, ... } from /api/my-network-levels
      */
     function levelGridHTML(levels) {
-        let activeIdx = LEVEL_COUNT; // default: every level full -> none "active"
+        const CAP = SLOTS_PER_LEVEL * 6;
+        const stats = [];
         for (let i = 0; i < LEVEL_COUNT; i++) {
-            if (((levels[i] || {}).total || 0) < SLOTS_PER_LEVEL) { activeIdx = i; break; }
+            const l = levels[i] || {};
+            const approved = l.approved != null ? l.approved
+                : (l.people || []).filter((p) => p.status === "approved").length;
+            stats.push({ depth: l.depth || i + 1, approved, pending: l.pending || 0 });
         }
+        const activeIdx = stats.findIndex((x) => x.approved < CAP);   // first level not yet complete
 
         let html = `<div class="hexnet-levels-grid">`;
-        for (let i = 0; i < LEVEL_COUNT; i++) {
-            const lvl = levels[i] || { depth: i + 1, total: 0, people: [] };
-            const people = lvl.people || [];
-            const state = i < activeIdx ? "completed" : i === activeIdx ? "active" : "locked";
-            const stateBadge = state === "completed" ? '<span class="hexnet-level-badge hexnet-level-badge-done"><i class="bi bi-check-circle-fill"></i> Full</span>'
-                : state === "active" ? '<span class="hexnet-level-badge hexnet-level-badge-active">Active</span>'
-                : '<span class="hexnet-level-badge hexnet-level-badge-locked"><i class="bi bi-lock-fill"></i> Next up</span>';
+        stats.forEach((st, i) => {
+            const complete = st.approved >= CAP;
+            const started = st.approved + st.pending > 0;
+            const state = complete ? "complete" : started ? "progress" : "notstarted";
+            const badge = complete ? '<span class="hexnet-level-badge hexnet-level-badge-done"><i class="bi bi-check-circle-fill"></i> Complete</span>'
+                : started ? '<span class="hexnet-level-badge hexnet-level-badge-active">In progress</span>'
+                : '<span class="hexnet-level-badge hexnet-level-badge-locked"><i class="bi bi-lock-fill"></i> Not started</span>';
+            const doneHex = Math.min(SLOTS_PER_LEVEL, Math.floor(st.approved / 6));
 
-            const remaining = Math.max(0, SLOTS_PER_LEVEL - lvl.total);
-
-            html += `<div class="hexnet-level-row hexnet-level-${state}" data-depth="${lvl.depth}">
+            html += `<div class="hexnet-level-row hexnet-level-${state}" data-depth="${st.depth}">
                 <div class="hexnet-level-label">
-                    <span class="hexnet-level-num">Level ${lvl.depth}</span>
-                    <span class="hexnet-level-count">${lvl.total} referred</span>
-                    ${lvl.pending ? `<span class="hexnet-level-pending"><i class="bi bi-hourglass-split"></i> ${lvl.pending} pending</span>` : ""}
-                    ${remaining > 0 ? `<span class="hexnet-level-remaining">${remaining} more to fill this level</span>` : ""}
-                    ${stateBadge}
+                    <span class="hexnet-level-num">Level ${st.depth}</span>
+                    <span class="hexnet-level-count">${st.approved} approved &middot; ${doneHex}/${SLOTS_PER_LEVEL} hexagons full</span>
+                    ${st.pending ? `<span class="hexnet-level-pending"><i class="bi bi-hourglass-split"></i> ${st.pending} pending</span>` : ""}
+                    ${complete ? "" : `<span class="hexnet-level-remaining">${CAP - st.approved} more to complete this level</span>`}
+                    ${badge}
                 </div>
                 <div class="hexnet-level-slots">`;
-            for (let s = 0; s < SLOTS_PER_LEVEL; s++) {
-                const person = people[s];
-                if (person) {
-                    // one hexagon = one real person; its sides = THAT person's approved referrals
-                    html += `<div class="hexnet-node hexnet-slot hexnet-slot-filled" data-id="${esc(person.id)}"
-                        tabindex="0" role="button"
-                        aria-label="${esc(person.name)}, ${STATUS_LABEL[person.status] || person.status}, ${Math.min(person.referrals || 0, 6)} of 6 sides filled">
-                        ${hexProgressSVG({ filled: Math.min(person.referrals || 0, 6), status: person.status, label: person.name })}
-                    </div>`;
-                } else {
-                    html += `<div class="hexnet-slot hexnet-slot-empty hexnet-slot-add" tabindex="0" role="button"
-                        aria-label="Locked slot - click to copy your referral link">
-                        ${hexProgressSVG({ filled: 0, label: "Empty slot" })}
-                    </div>`;
-                }
+            for (let h = 0; h < SLOTS_PER_LEVEL; h++) {
+                const filled = Math.max(0, Math.min(6, st.approved - 6 * h));
+                const upto = Math.max(0, Math.min(6, st.approved + st.pending - 6 * h));
+                const pend = upto - filled;
+                const current = i === activeIdx && h === Math.floor(st.approved / 6);
+                const locked = filled === 0 && pend === 0;
+                const title = filled >= 6 ? `Level ${st.depth} \u00b7 hexagon ${h + 1}: complete`
+                    : locked ? `Level ${st.depth} \u00b7 hexagon ${h + 1}: locked`
+                    : `Level ${st.depth} \u00b7 hexagon ${h + 1}: ${filled}/6 sides${pend ? `, ${pend} pending` : ""}`;
+                html += `<div class="hexnet-slot ${locked ? "hexnet-slot-empty hexnet-slot-add" : "hexnet-slot-filled"}"
+                    ${locked ? 'tabindex="0" role="button"' : ""} title="${esc(title)}">
+                    ${hexProgressSVG({ filled, pending: pend, active: current, label: title })}
+                </div>`;
             }
-            if (lvl.total > SLOTS_PER_LEVEL) {
-                html += `<div class="hexnet-level-more">+${lvl.total - SLOTS_PER_LEVEL} more</div>`;
-            }
+            if (st.approved > CAP) html += `<div class="hexnet-level-more">+${st.approved - CAP} more</div>`;
             html += `</div></div>`;
-        }
+        });
         html += `</div>`;
         return html;
     }
@@ -504,7 +531,7 @@ const HexNetwork = (function () {
         return `<div class="hexnet-node hexnet-tree-node" data-id="${esc(node.id)}" style="--slot-color:${color}"
                      tabindex="0" role="button" aria-label="${esc(node.name)}, ${STATUS_LABEL[node.status] || node.status}">
             <span class="hexnet-tree-dot"></span>
-            <span class="hexnet-tree-name">${esc(shortLabel(node.name))}</span>
+            <span class="hexnet-tree-name" title="${esc(node.name)}">${esc(node.name)}</span>
             ${node.referrals ? `<span class="hexnet-tree-count">${node.referrals}</span>` : ""}
         </div>`;
     }
@@ -545,7 +572,7 @@ const HexNetwork = (function () {
             const color = STATUS_COLOR[n.status] || STATUS_COLOR.approved;
             return `<div class="hexnet-node hexnet-solo-dot" data-id="${esc(n.id)}" style="--slot-color:${color}"
                          tabindex="0" role="button" aria-label="${esc(n.name)}, ${STATUS_LABEL[n.status] || n.status}, no referrer">
-                <span class="hexnet-tree-dot"></span>${esc(shortLabel(n.name))}
+                <span class="hexnet-tree-dot"></span><span class="hexnet-tree-name" title="${esc(n.name)}">${esc(n.name)}</span>
             </div>`;
         }).join("");
     }

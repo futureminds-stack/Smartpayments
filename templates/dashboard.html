@@ -144,8 +144,7 @@
             </div>
 
             <h6 class="fw-bold mb-1 mt-2">Your network, level by level</h6>
-            <p class="text-muted small mb-3">Every hexagon below is one real person. Their sides fill as <em>their</em> referrals get approved, a full hexagon needs 6, and a padlock means they haven't referred anyone yet. Each of the 5 levels shows up to 5 people; tap a padlock slot to copy your invite link.</p>
-            <div class="d-flex flex-wrap gap-3 mb-3" id="myNetworkLegend"></div>
+            <p class="text-muted small mb-3">Each level has 5 hexagons with 6 sides. Every approved person at that level lights the next side; 6 fill a hexagon and the count carries on into the next one. When all 5 are full (30 people) the level is complete. Tap a padlock to copy your invite link.</p>
             <div class="hexnet-mini-wrap" id="myNetworkWidget">
                 <div class="text-center text-muted py-3 w-100"><div class="spinner-border spinner-border-sm text-success me-2"></div>Loading your network…</div>
             </div>
@@ -372,13 +371,11 @@
 <script>
 (function () {
     const levelsWrap = document.getElementById("myNetworkWidget");
-    const legendWrap = document.getElementById("myNetworkLegend");
     const pendingEl = document.getElementById("totalPendingCount");
     const approvedEl = document.getElementById("approvedCount");
     const REF_LINK = {{ ref_link|tojson }};
     let lastLevelsKey = null;
 
-    if (legendWrap) legendWrap.innerHTML = HexNetwork.statusLegendHTML();
 
     // Keep the "Approved Referrals" stat live
     function loadChain() {
@@ -403,7 +400,6 @@
                 if (key === lastLevelsKey) return;
                 lastLevelsKey = key;
                 levelsWrap.innerHTML = HexNetwork.levelGridHTML(data.levels);
-                HexNetwork.attachInteractivity(levelsWrap, HexNetwork.levelNodeMap(data.levels), {});
                 HexNetwork.attachLevelGridAddSlots(levelsWrap, REF_LINK, copyToClipboard);
             })
             .catch(() => {
