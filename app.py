@@ -240,6 +240,27 @@ def format_ts(ts):
     except Exception:
         return "-"
 
+def day_label(ts):
+    """'Today' / 'Yesterday' / '12 Oct 2026' in India time, for chat-style date dividers."""
+    if not ts:
+        return ""
+    try:
+        d = datetime.fromtimestamp(float(ts), IST).date()
+        today = datetime.now(IST).date()
+        if d == today:
+            return "Today"
+        if d == today - timedelta(days=1):
+            return "Yesterday"
+        return d.strftime("%d %b %Y")
+    except Exception:
+        return ""
+
+def time_only(ts):
+    try:
+        return datetime.fromtimestamp(float(ts), IST).strftime("%I:%M %p").lstrip("0")
+    except Exception:
+        return ""
+
 def wants_json():
     """True for fetch()/XHR callers (the animated payment flow)."""
     return (request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -862,6 +883,8 @@ def dashboard():
                 wallet_txns = wallet.get_transactions(user["public_user_id"])
                 for t in wallet_txns:
                     t["created_at_display"] = format_ts(t.get("created_at"))
+                    t["day_label"] = day_label(t.get("created_at"))
+                    t["time_display"] = time_only(t.get("created_at"))
             except Exception as e:
                 logger.error(f"Wallet load error for {user['public_user_id']}: {e}")
                 my_wallet = None
@@ -1026,6 +1049,26 @@ def verify_pin(conn, user_id, pin):
         left = PIN_MAX_ATTEMPTS - attempts
         return False, "pin_invalid", f"Incorrect PIN. {left} attempt{'s' if left != 1 else ''} left."
 
+@app.route("/wallet/pin/verify", methods=["POST"])
+@limiter.limit("30 per hour")
+def wallet_pin_verify():
+    """Checks the current PIN so 'Change PIN' can reject a wrong one right
+    away (same attempt counter and lockout as paying)."""
+    if "user_id" not in session:
+        return jsonify({"ok": False, "error": "Please log in again."}), 401
+    conn = get_db()
+    try:
+        ok, code, msg = verify_pin(conn, session["user_id"], request.form.get("pin", ""))
+        if ok:
+            return jsonify({"ok": True})
+        return jsonify({"ok": False, "error": msg, "code": code}), (423 if code == "pin_locked" else 403)
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"PIN verify error: {e}")
+        return jsonify({"ok": False, "error": "Could not check your PIN. Please try again."}), 500
+    finally:
+        release_db(conn)
+
 @app.route("/wallet/pin/set", methods=["POST"])
 @limiter.limit("10 per hour")
 def wallet_pin_set():
@@ -1182,6 +1225,7 @@ def wallet_transfer():
                 "to_name": recipient["full_name"],
                 "to_id": recipient["public_user_id"],
                 "created_at_display": format_ts(result["created_at"]),
+                "time_display": time_only(result["created_at"]),
             })
         flash(msg, "success")
     except wallet.WalletError as e:

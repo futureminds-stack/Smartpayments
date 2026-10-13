@@ -16,7 +16,9 @@ const WalletPay = (function () {
     const PIN_LEN = 4;
     let cfg = null, els = {}, state = { to: null, name: null, amount: 0, result: null };
     let pins = {};          // keypad controllers by name
-    let createMode = "pay"; // after creating a PIN: continue paying, or just save
+    let createMode = "pay"; // after creating a PIN: "pay" (continue paying) | "setup" (first PIN) | "change"
+    let enterMode = "pay";  // PIN entry screen: "pay" | "change" (verify current PIN first)
+    let flow = { current: null }; // current PIN or account password while changing/resetting
 
     const rupee = (n) => "\u20b9" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const $ = (id) => document.getElementById(id);
@@ -29,7 +31,7 @@ const WalletPay = (function () {
     });
 
     function init(options) {
-        cfg = Object.assign({ transferUrl: "", recipientUrl: "", pinSetUrl: "", myId: "", hasPin: false, onSuccess: null }, options);
+        cfg = Object.assign({ transferUrl: "", recipientUrl: "", pinSetUrl: "", pinVerifyUrl: "", myId: "", hasPin: false, onSuccess: null }, options);
         els = {
             overlay: $("payOverlay"), stage: $("payStage"),
             to: $("payTo"), amount: $("payAmount"), err1: $("payErr1"), next: $("payNext"),
@@ -51,9 +53,11 @@ const WalletPay = (function () {
         els.next.addEventListener("click", goConfirm);
         els.back.addEventListener("click", () => showStep(1));
         els.confirmBtn.addEventListener("click", afterConfirm);
-        $("payPinBack").addEventListener("click", () => showStep(2));
-        $("payForgotPin").addEventListener("click", (e) => { e.preventDefault(); openPinSettings(true); });
-        $("payPinSave").addEventListener("click", savePinForm);
+        $("payPinBack").addEventListener("click", () => (enterMode === "pay" ? showStep(2) : close()));
+        $("payForgotPin").addEventListener("click", (e) => { e.preventDefault(); showForgot(); });
+        $("payPwdBack").addEventListener("click", () => startEnter(enterMode));
+        $("payPwdContinue").addEventListener("click", pwdContinue);
+        $("payPwd").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); pwdContinue(); } });
         [els.to, els.amount].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); goConfirm(); } }));
         $("payDone").addEventListener("click", finish);
         $("payRetry").addEventListener("click", () => { hideStage(); open(state.to || ""); showStep(2); });
@@ -102,7 +106,7 @@ const WalletPay = (function () {
         for (let i = 1; i <= 5; i++) { const el = $("payStep" + i); if (el) el.hidden = i !== n; }
         if (n === 1) setTimeout(() => (els.to.value ? els.amount : els.to).focus(), 60);
         if (n === 3) { pins.enter.clear(); pins.enter.disable(false); $("payErr3").textContent = ""; }
-        if (n === 5) $("payPinErr").textContent = "";
+        if (n === 5) { $("payPwd").value = ""; $("payPwdErr").textContent = ""; setTimeout(() => $("payPwd").focus(), 80); }
     }
     function open(prefillId) {
         els.overlay.classList.add("open");
@@ -154,98 +158,113 @@ const WalletPay = (function () {
 
     // ── PIN: enter / create / change ─────────────────────────
     function afterConfirm() {
-        if (cfg.hasPin) {
-            $("payPinFor").textContent = `Paying ${rupee(state.amount)} to ${state.name}`;
-            showStep(3);
-        } else {
-            startCreate("pay");
+        if (cfg.hasPin) startEnter("pay");
+        else startCreate("pay");
+    }
+
+    /** PIN entry keypad. mode "pay" approves the payment; "change" checks the
+        current PIN first (wrong guesses are rejected immediately). */
+    function startEnter(mode, errorText) {
+        enterMode = mode;
+        $("payEnterTitle").textContent = mode === "pay" ? "Enter PIN" : "Change PIN";
+        $("payPinFor").textContent = mode === "pay" ? `Paying ${rupee(state.amount)} to ${state.name}` : "Enter your current PIN";
+        reopenAtStep(3);
+        if (errorText) $("payErr3").textContent = errorText;
+    }
+    function onEnterPin(pin) { enterMode === "pay" ? pay(pin) : verifyCurrent(pin); }
+
+    async function verifyCurrent(pin) {
+        pins.enter.disable(true);
+        try {
+            const r = await post(cfg.pinVerifyUrl, { pin });
+            const d = await r.json().catch(() => ({}));
+            if (r.ok && d.ok) { flow.current = pin; startCreate("change"); return; }
+            $("payErr3").textContent = d.error || "Could not check your PIN.";
+            pins.enter.shake();
+            if (d.code === "pin_locked") return;   // stays disabled; "Forgot PIN?" still works
+            setTimeout(() => { pins.enter.clear(); pins.enter.disable(false); }, 350);
+        } catch (e) {
+            $("payErr3").textContent = "Network problem. Please try again.";
+            pins.enter.clear(); pins.enter.disable(false);
         }
     }
-    function onEnterPin(pin) { pay(pin); }
+
+    // Forgot PIN: prove identity with the account password instead
+    function showForgot() { reopenAtStep(5); }
+    function pwdContinue() {
+        const v = $("payPwd").value;
+        if (!v) { $("payPwdErr").textContent = "Enter your account password."; return; }
+        flow.current = v;
+        startCreate("change");
+    }
 
     let createFirst = null;
     function startCreate(mode) {
         createMode = mode;
         createFirst = null;
-        $("payPinTitle").textContent = "Create payment PIN";
-        $("payPinSub").textContent = mode === "pay"
-            ? "Set a 4-digit PIN. You'll use it to approve every payment."
-            : "Choose a 4-digit PIN to approve your payments.";
+        $("payPinTitle").textContent = mode === "change" ? "Choose a new PIN" : "Create payment PIN";
+        $("payPinSub").textContent = mode === "pay" ? "Set a 4-digit PIN. You'll use it to approve every payment."
+            : mode === "change" ? "Pick 4 digits you'll remember." : "Choose a 4-digit PIN to approve your payments.";
         $("payErr4").textContent = "";
         reopenAtStep(4);
         pins.create.clear(); pins.create.disable(false);
     }
+    function restartCreate(msg) {
+        createFirst = null;
+        $("payPinTitle").textContent = createMode === "change" ? "Choose a new PIN" : "Create payment PIN";
+        $("payPinSub").textContent = "Choose a 4-digit PIN.";
+        $("payErr4").textContent = msg || "";
+        pins.create.shake();
+        setTimeout(() => { pins.create.clear(); pins.create.disable(false); }, 350);
+    }
     async function onCreatePin(pin) {
-        const err = $("payErr4");
         if (createFirst === null) {
             createFirst = pin;
             $("payPinTitle").textContent = "Confirm your PIN";
             $("payPinSub").textContent = "Enter the same 4 digits again.";
-            err.textContent = "";
+            $("payErr4").textContent = "";
             pins.create.clear();
             return;
         }
-        if (pin !== createFirst) {
-            err.textContent = "The PINs didn't match. Start again.";
-            pins.create.shake(); createFirst = null;
-            $("payPinTitle").textContent = "Create payment PIN";
-            $("payPinSub").textContent = "Set a 4-digit PIN.";
-            setTimeout(() => pins.create.clear(), 350);
-            return;
-        }
+        if (pin !== createFirst) { restartCreate("The PINs didn't match. Start again."); return; }
+
         pins.create.disable(true);
         try {
-            const r = await post(cfg.pinSetUrl, { new_pin: pin, confirm_pin: pin });
+            const params = { new_pin: pin, confirm_pin: pin };
+            if (createMode === "change") params.current = flow.current;
+            const r = await post(cfg.pinSetUrl, params);
             const d = await r.json().catch(() => ({}));
             if (!r.ok || !d.ok) {
-                err.textContent = d.error || "Could not save your PIN. Please try again.";
-                pins.create.shake(); createFirst = null;
-                $("payPinTitle").textContent = "Create payment PIN";
-                $("payPinSub").textContent = "Choose a different 4-digit PIN.";
-                setTimeout(() => { pins.create.clear(); pins.create.disable(false); }, 350);
+                // identity check failed at the last step -> back to where it was asked
+                if (createMode === "change" && ["auth_required", "pin_invalid", "pin_locked"].includes(d.code)) {
+                    const usedPassword = !/^\d{4}$/.test(flow.current || "");
+                    flow.current = null;
+                    if (usedPassword) { reopenAtStep(5); $("payPwdErr").textContent = d.error || "That password didn't work."; }
+                    else startEnter("change", d.error);
+                    return;
+                }
+                restartCreate(d.error || "Could not save your PIN. Please try again.");
                 return;
             }
             setHasPin(true);
+            flow.current = null;
             if (createMode === "pay") { pay(pin); }
-            else { close(); showToast("Payment PIN saved.", "success"); }
+            else { close(); showToast(createMode === "change" ? "Payment PIN changed." : "Payment PIN saved.", "success"); }
         } catch (e) {
-            err.textContent = "Network problem. Please try again.";
-            createFirst = null; pins.create.clear(); pins.create.disable(false);
+            restartCreate("Network problem. Please try again.");
         }
     }
 
     function setHasPin(v) {
         cfg.hasPin = !!v;
-        document.querySelectorAll("[data-pin-label]").forEach((el) => { el.textContent = cfg.hasPin ? "Change PIN" : "Set PIN"; });
+        document.querySelectorAll("[data-pin-label]").forEach((el) => { el.textContent = cfg.hasPin ? "My PIN" : "Set PIN"; });
     }
 
-    // Change / reset PIN form (also reached from "Forgot PIN?")
-    function openPinSettings(fromForgot) {
-        if (!cfg.hasPin) { startCreate("setup"); return; }
-        $("pinCurrent").value = ""; $("pinNew").value = ""; $("pinNew2").value = "";
-        $("payPinErr").textContent = "";
-        $("pinCurrentHint").textContent = fromForgot === true
-            ? "Forgot your PIN? Enter your account password here."
-            : "Current PIN \u2014 or your account password if you forgot it.";
-        reopenAtStep(5);
-        setTimeout(() => $("pinCurrent").focus(), 80);
-    }
-    async function savePinForm() {
-        const err = $("payPinErr");
-        const cur = $("pinCurrent").value, n1 = $("pinNew").value.trim(), n2 = $("pinNew2").value.trim();
-        err.textContent = "";
-        if (!cur) { err.textContent = "Enter your current PIN or account password."; return; }
-        if (!/^\d{4}$/.test(n1)) { err.textContent = "New PIN must be exactly 4 digits."; return; }
-        if (n1 !== n2) { err.textContent = "The two new PINs don't match."; return; }
-        const btn = $("payPinSave"); btn.disabled = true;
-        try {
-            const r = await post(cfg.pinSetUrl, { current: cur, new_pin: n1, confirm_pin: n2 });
-            const d = await r.json().catch(() => ({}));
-            if (!r.ok || !d.ok) { err.textContent = d.error || "Could not save your PIN."; return; }
-            close(); showToast("Payment PIN updated.", "success");
-        } catch (e) {
-            err.textContent = "Network problem. Please try again.";
-        } finally { btn.disabled = false; }
+    // Entry point for the "Set PIN / Change PIN" button
+    function openPinSettings() {
+        flow.current = null;
+        if (!cfg.hasPin) startCreate("setup");
+        else startEnter("change");
     }
 
     // ── stage helpers ────────────────────────────────────────

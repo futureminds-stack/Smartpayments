@@ -83,3 +83,17 @@ function showToast(message, type = 'info') {
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 }
+
+// ─── Ripple feedback on tap/click ─────────────────────────
+document.addEventListener('pointerdown', function (e) {
+    const el = e.target.closest('.btn, .dx-btn, .dx-tile, .pay-swipe, .pay-chip, .pin-key, .pay-x');
+    if (!el || el.disabled) return;
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    el.style.overflow = 'hidden';
+    const r = el.getBoundingClientRect(), size = Math.max(r.width, r.height);
+    const dot = document.createElement('span');
+    dot.className = 'rpl';
+    dot.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+    el.appendChild(dot);
+    setTimeout(() => dot.remove(), 600);
+}, { passive: true });

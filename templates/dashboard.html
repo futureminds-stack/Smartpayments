@@ -2,231 +2,224 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<nav class="navbar dashboard-nav">
-    <div class="container">
-        <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}"><i class="bi bi-hexagon-fill"></i> ReferralPay</a>
-        <div class="d-flex align-items-center gap-2 gap-md-3">
-            <span class="badge level-badge level-{{ user.user_level or 'Starter' }} d-none d-sm-inline-block">{{ user.user_level or 'Starter' }}</span>
+{# ═════════ App bar ═════════ #}
+<header class="dx-appbar">
+    <div class="dx-appbar-in">
+        <a class="dx-brand" href="{{ url_for('dashboard') }}"><span class="dx-brand-hex"><i class="bi bi-hexagon-fill"></i></span> ReferralPay</a>
+        <div class="dx-appbar-right">
+            <span class="dx-pill level-{{ user.user_level or 'Starter' }}"><i class="bi bi-trophy-fill"></i> {{ user.user_level or 'Starter' }}</span>
             {% if session.is_admin %}
-            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light"><i class="bi bi-shield-shaded"></i> <span class="d-none d-sm-inline">Admin</span></a>
+            <a href="{{ url_for('admin_dashboard') }}" class="dx-iconbtn" title="Admin panel"><i class="bi bi-shield-shaded"></i></a>
             {% endif %}
-            <div class="dropdown">
-                <button class="btn btn-dark btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-person-circle"></i> <span class="d-none d-sm-inline">{{ session.full_name }}</span>
+            <div class="dx-menu" id="dxMenu">
+                <button type="button" class="dx-menu-btn" id="dxMenuBtn" aria-haspopup="true" aria-expanded="false">
+                    <span class="avatar avatar-sm">{{ user.full_name[0]|upper if user.full_name else "?" }}</span>
+                    <span class="dx-menu-name">{{ session.full_name }}</span>
+                    <i class="bi bi-chevron-down"></i>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="{{ url_for('edit_profile') }}"><i class="bi bi-person-gear"></i> Edit Profile</a></li>
-                    <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
-                </ul>
+                <div class="dx-menu-list" role="menu">
+                    <a href="{{ url_for('edit_profile') }}" role="menuitem"><i class="bi bi-person-gear"></i> Edit profile</a>
+                    <a href="{{ url_for('logout') }}" role="menuitem"><i class="bi bi-box-arrow-right"></i> Log out</a>
+                </div>
             </div>
         </div>
     </div>
-</nav>
+</header>
 
-<div class="container py-4" style="max-width: 1100px;">
+<main class="dx-wrap" id="top">
 
-    {# ── Greeting ── #}
-    <div class="mb-4 d-flex align-items-center gap-3">
-        <div class="position-relative flex-shrink-0">
-            <div class="avatar avatar-lg">{{ user.full_name[0]|upper if user.full_name else "?" }}</div>
-            <a href="{{ url_for('edit_profile') }}" class="avatar-edit-badge" title="Edit Profile"><i class="bi bi-pencil-fill"></i></a>
-        </div>
+    {# ═════════ Greeting ═════════ #}
+    <section class="dx-greet rise">
+        <div class="dx-avatar-ring"><div class="avatar avatar-lg">{{ user.full_name[0]|upper if user.full_name else "?" }}</div></div>
         <div>
-            <h3 class="fw-bold mb-0">Hello, {{ user.full_name }}!</h3>
-            <span class="text-muted small">{{ now.strftime('%A, %d %B %Y') }}</span>
+            <div class="dx-hello"><span id="dxGreeting">Hello</span>, <b>{{ user.full_name }}</b> <span class="dx-wave">👋</span></div>
+            <div class="dx-date">{{ now.strftime('%A, %d %B %Y') }}</div>
         </div>
-    </div>
+    </section>
 
-    {# ── Balance hero + Send ── #}
-    <div class="wa-hero mb-4">
+    {# ═════════ Wallet hero ═════════ #}
+    <section class="dx-hero rise" style="--d:.05s">
+        <span class="dx-blob b1"></span><span class="dx-blob b2"></span>
         {% if wallet_enabled and wallet %}
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="dx-hero-top">
             <div>
-                <div class="small" style="opacity:.85"><i class="bi bi-wallet2"></i> Wallet balance</div>
-                <div class="balance" id="walletBalance">{{ format_currency(wallet.balance) }}</div>
-                <div class="small mt-1" style="opacity:.8">Lifetime referral earnings {{ format_currency(user.amount_earned) }} (already included)</div>
+                <div class="dx-hero-label"><i class="bi bi-wallet2"></i> Wallet balance</div>
+                <div class="dx-balance" id="walletBalance" data-value="{{ wallet.balance }}">{{ format_currency(wallet.balance) }}</div>
             </div>
-            <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-send" data-open-pay><i class="bi bi-send-fill"></i> Send money</button>
-                <button type="button" class="btn btn-ghost" onclick="copyToClipboard('{{ user.public_user_id }}')"><i class="bi bi-qr-code"></i> Copy my Wallet ID</button>
-                <button type="button" class="btn btn-ghost" data-open-pin-settings><i class="bi bi-key-fill"></i> <span data-pin-label>{{ 'Change PIN' if has_pin else 'Set PIN' }}</span></button>
-            </div>
+            <div class="dx-hero-chip"><i class="bi bi-gift-fill"></i> {{ format_currency(user.amount_earned) }} from referrals</div>
+        </div>
+        <div class="dx-actions">
+            <button type="button" class="dx-action" data-open-pay><span class="dx-action-ic"><i class="bi bi-send-fill"></i></span><span>Send</span></button>
+            <button type="button" class="dx-action" data-copy="{{ user.public_user_id }}"><span class="dx-action-ic"><i class="bi bi-qr-code"></i></span><span>My ID</span></button>
+            <button type="button" class="dx-action" data-open-pin-settings><span class="dx-action-ic"><i class="bi bi-shield-lock-fill"></i></span><span data-pin-label>{{ 'My PIN' if has_pin else 'Set PIN' }}</span></button>
+            <a class="dx-action" href="#invite"><span class="dx-action-ic"><i class="bi bi-person-plus-fill"></i></span><span>Invite</span></a>
         </div>
         {% elif wallet_enabled %}
-        <div class="fw-semibold"><i class="bi bi-wallet2"></i> Wallet</div>
-        <div class="mt-1" style="opacity:.9">Your wallet couldn't be loaded right now. Please refresh in a moment.</div>
+        <div class="dx-hero-label"><i class="bi bi-wallet2"></i> Wallet</div>
+        <p class="dx-hero-note">Your wallet couldn't be loaded right now. Please refresh in a moment.</p>
         {% else %}
-        <div class="fw-semibold"><i class="bi bi-wallet2"></i> Wallet</div>
-        <div class="mt-1" style="opacity:.9">Wallet is not configured yet. Set <code>MONGODB_URI</code> in the environment to enable balances and transfers.</div>
+        <div class="dx-hero-label"><i class="bi bi-wallet2"></i> Wallet</div>
+        <p class="dx-hero-note">Wallet is not configured yet. Set <code>MONGODB_URI</code> in the environment to enable balances and transfers.</p>
         {% endif %}
-    </div>
+    </section>
 
-    {# ── Stat chips ── #}
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="stat-card">
-                <div class="stat-icon mb-2"><i class="bi bi-fingerprint"></i></div>
-                <div class="text-muted small">Referral / Wallet ID</div>
-                <div class="font-monospace fw-bold text-truncate" id="public-id">{{ user.public_user_id }}</div>
-                <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyToClipboard('{{ user.public_user_id }}')"><i class="bi bi-clipboard"></i> Copy</button>
-            </div>
+    {# ═════════ Invite ═════════ #}
+    <section class="dx-invite rise" id="invite" style="--d:.1s">
+        <div class="dx-invite-text">
+            <h3><i class="bi bi-people-fill"></i> Invite friends</h3>
+            <p>Every person the admin approves lights a side of your hexagon.</p>
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="stat-card">
-                <div class="stat-icon mb-2"><i class="bi bi-trophy"></i></div>
-                <div class="text-muted small">My Level</div>
-                <div class="fw-bold fs-5">{{ user.user_level or 'Starter' }}</div>
-            </div>
+        <div class="dx-invite-row">
+            <input type="text" value="{{ ref_link }}" id="ref-link" readonly aria-label="Your referral link">
+            <button type="button" class="dx-btn dx-btn-light" data-copy="{{ ref_link }}"><i class="bi bi-clipboard"></i> Copy</button>
+            <a class="dx-btn dx-btn-wa" target="_blank" rel="noopener" href="https://wa.me/?text={{ ('Join me on ReferralPay! Register with my link: ' ~ ref_link)|urlencode }}"><i class="bi bi-whatsapp"></i> Share</a>
         </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="stat-card">
-                <div class="stat-icon mb-2"><i class="bi bi-hash"></i></div>
-                <div class="text-muted small">System Generated ID</div>
-                <div class="font-monospace fw-bold text-truncate" id="wallet-id" style="font-size:.85rem;">{{ wallet_id_display }}</div>
-                <button class="btn btn-sm btn-outline-secondary mt-2" onclick="copyToClipboard('{{ wallet_id_display }}')"><i class="bi bi-clipboard"></i> Copy</button>
-            </div>
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="stat-card">
-                <div class="stat-icon mb-2"><i class="bi bi-arrow-up-circle"></i></div>
-                <div class="text-muted small">My Upline</div>
-                <div class="font-monospace fw-bold text-truncate">{{ user.referral_id or 'None' }}</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="stat-card">
-                <div class="stat-icon mb-2"><i class="bi bi-people"></i></div>
-                <div class="text-muted small">Approved Referrals</div>
-                <div class="fw-bold fs-4" id="approvedCount">{{ user.referral_count }}</div>
-            </div>
-        </div>
-        <div class="col-6 col-md-4 col-lg-2">
-            <div class="stat-card">
-                <div class="stat-icon mb-2"><i class="bi bi-currency-rupee"></i></div>
-                <div class="text-muted small">Referral Earnings</div>
-                <div class="fw-bold fs-4 text-success">{{ format_currency(user.amount_earned) }}</div>
-            </div>
-        </div>
-    </div>
+    </section>
 
-    {# ── Referral link ── #}
-    <div class="referral-box mb-4">
-        <div class="row align-items-center g-2">
-            <div class="col-md-5">
-                <h5 class="fw-bold mb-0"><i class="bi bi-share"></i> Your Referral Link</h5>
-                <div class="small" style="opacity:.85">Each person the admin approves fills one side of your hexagon.</div>
-            </div>
-            <div class="col-md-7">
-                <div class="input-group">
-                    <input type="text" class="form-control" value="{{ ref_link }}" id="ref-link" readonly>
-                    <button class="btn btn-light" onclick="copyToClipboard(document.getElementById('ref-link').value)" title="Copy link"><i class="bi bi-clipboard"></i></button>
-                </div>
-            </div>
+    {# ═════════ Stat tiles ═════════ #}
+    <section class="dx-stats">
+        <button type="button" class="dx-tile rise" style="--d:.12s" data-copy="{{ user.public_user_id }}" title="Tap to copy">
+            <span class="dx-tile-ic"><i class="bi bi-fingerprint"></i></span>
+            <span class="dx-tile-label">Referral / Wallet ID</span>
+            <span class="dx-tile-val mono">{{ user.public_user_id }}</span>
+            <span class="dx-tile-hint"><i class="bi bi-clipboard"></i> tap to copy</span>
+        </button>
+        <div class="dx-tile rise" style="--d:.15s">
+            <span class="dx-tile-ic"><i class="bi bi-people-fill"></i></span>
+            <span class="dx-tile-label">Approved referrals</span>
+            <span class="dx-tile-val big" id="approvedCount">{{ user.referral_count or 0 }}</span>
         </div>
-    </div>
+        <div class="dx-tile rise" style="--d:.18s">
+            <span class="dx-tile-ic gold"><i class="bi bi-trophy-fill"></i></span>
+            <span class="dx-tile-label">My level</span>
+            <span class="dx-tile-val big">{{ user.user_level or 'Starter' }}</span>
+        </div>
+        <div class="dx-tile rise" style="--d:.21s">
+            <span class="dx-tile-ic"><i class="bi bi-currency-rupee"></i></span>
+            <span class="dx-tile-label">Referral earnings</span>
+            <span class="dx-tile-val big good">{{ format_currency(user.amount_earned) }}</span>
+        </div>
+        <button type="button" class="dx-tile rise" style="--d:.24s" data-copy="{{ wallet_id_display }}" title="Tap to copy">
+            <span class="dx-tile-ic"><i class="bi bi-hash"></i></span>
+            <span class="dx-tile-label">System generated ID</span>
+            <span class="dx-tile-val mono small">{{ wallet_id_display }}</span>
+            <span class="dx-tile-hint"><i class="bi bi-clipboard"></i> tap to copy</span>
+        </button>
+        <div class="dx-tile rise" style="--d:.27s">
+            <span class="dx-tile-ic"><i class="bi bi-arrow-up-circle-fill"></i></span>
+            <span class="dx-tile-label">My upline</span>
+            <span class="dx-tile-val mono small">{{ user.referral_id or 'None' }}</span>
+        </div>
+    </section>
 
-    {# ── Hexagons ── #}
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h5 class="mb-0"><i class="bi bi-hexagon-fill text-success"></i> My Hexagons</h5>
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-warning text-dark" title="Waiting for admin approval across your downline">
-                    <i class="bi bi-hourglass-split"></i> <span id="totalPendingCount">–</span> pending overall
-                </span>
-                <span class="small text-muted"><span class="hexnet-live-dot"></span>Live</span>
+    {# ═════════ Hexagons ═════════ #}
+    <section class="dx-card rise" id="hexagons" style="--d:.1s">
+        <div class="dx-card-head">
+            <h3><i class="bi bi-hexagon-fill"></i> My Hexagons</h3>
+            <div class="dx-card-head-right">
+                <span class="dx-badge warn" title="Waiting for admin approval across your downline"><i class="bi bi-hourglass-split"></i> <span id="totalPendingCount">–</span> pending</span>
+                <span class="dx-live"><span class="hexnet-live-dot"></span>Live</span>
             </div>
         </div>
-        <div class="card-body">
-            <div class="hex-legend mb-3">
-                <span><i class="l-on"></i>Approved referral = filled side</span>
+        <div class="dx-card-body">
+            <p class="dx-muted">Each level has 5 hexagons with 6 sides. Every approved person at that level lights the next side; 6 fill a hexagon and the count carries on into the next one. When all 5 are full (30 people) the level is complete. Tap a padlock to copy your invite link.</p>
+            <div class="hex-legend">
+                <span><i class="l-on"></i>Approved = lit side</span>
                 <span><i class="l-pend"></i>Waiting for admin</span>
-                <span><i class="bi bi-lock-fill l-lock"></i>Locked – nobody referred yet</span>
+                <span><i class="bi bi-lock-fill l-lock"></i>Not started</span>
             </div>
-
-            <h6 class="fw-bold mb-1 mt-2">Your network, level by level</h6>
-            <p class="text-muted small mb-3">Each level has 5 hexagons with 6 sides. Every approved person at that level lights the next side; 6 fill a hexagon and the count carries on into the next one. When all 5 are full (30 people) the level is complete. Tap a padlock to copy your invite link.</p>
-            <div class="hexnet-mini-wrap" id="myNetworkWidget">
-                <div class="text-center text-muted py-3 w-100"><div class="spinner-border spinner-border-sm text-success me-2"></div>Loading your network…</div>
-            </div>
-        </div>
-    </div>
-
-    {# ── Wallet activity (chat style) + referrals ── #}
-    <div class="row g-3 mb-4">
-        <div class="col-lg-7">
-            <div class="card h-100">
-                <div class="card-header"><h5 class="mb-0"><i class="bi bi-chat-dots-fill text-success"></i> Wallet Activity</h5></div>
-                <div class="chat-pane chat-scroll" id="txnPane">
-                    <div class="chat-list" id="txnList">
-                        {% for t in wallet_txns|reverse %}
-                        {% set sent = (t.from_id == user.public_user_id) %}
-                        <div class="bubble {{ 'out' if sent else 'in' }}">
-                            <div class="who">{% if sent %}Sent to {{ t.to_name or t.to_id }}{% else %}Received from {{ t.from_name or t.from_id }}{% endif %}</div>
-                            <div class="amt">{{ '-' if sent else '+' }}{{ format_currency(t.amount) }}</div>
-                            <div class="meta"><span class="txn">{{ t.txn_id }}</span><span>{{ t.created_at_display }}</span>{% if sent %}<i class="bi bi-check2-all"></i>{% endif %}</div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="text-center py-4 text-muted {{ 'd-none' if wallet_txns else '' }}" id="txnEmpty">
-                        <i class="bi bi-wallet fs-1"></i>
-                        <p class="mb-0">No transactions yet.</p>
-                    </div>
+            <div class="hexnet-mini-wrap" id="myNetworkWidget" aria-live="polite">
+                <div class="dx-skel-rows" aria-label="Loading your network">
+                    <div class="dx-skel"></div><div class="dx-skel"></div><div class="dx-skel"></div>
                 </div>
             </div>
         </div>
-        <div class="col-lg-5">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-people-fill text-success"></i> Recent Referrals</h5>
-                    <span class="badge bg-success text-dark">{{ referrals|length }}</span>
-                </div>
-                <div class="card-body p-0">
-                    {% if referrals %}
-                    {% for ref in referrals %}
-                    <div class="chat-row">
-                        <div class="avatar">{{ ref.full_name[0]|upper if ref.full_name else '?' }}</div>
-                        <div>
-                            <div class="name">{{ ref.full_name }}</div>
-                            <div class="sub"><i class="bi bi-check2-all" style="color:var(--wa-tick)"></i> Approved</div>
-                        </div>
-                        <div class="time">
-                            <div class="text-success fw-bold">+₹100.00</div>
-                            {{ ref.approved_at.strftime('%d %b %Y') if ref.approved_at else ref.created_at.strftime('%d %b %Y') }}
-                        </div>
+    </section>
+
+    {# ═════════ Activity + referrals ═════════ #}
+    <div class="dx-two">
+        <section class="dx-card rise" id="activity" style="--d:.1s">
+            <div class="dx-card-head"><h3><i class="bi bi-chat-dots-fill"></i> Wallet activity</h3></div>
+            <div class="chat-pane chat-scroll" id="txnPane">
+                <div class="chat-list" id="txnList">
+                    {% set ns = namespace(day='') %}
+                    {% for t in wallet_txns|reverse %}
+                    {% set sent = (t.from_id == user.public_user_id) %}
+                    {% set dl = t.day_label|default('') %}
+                    {% if dl != ns.day %}{% set ns.day = dl %}<div class="chat-day"><span>{{ dl }}</span></div>{% endif %}
+                    <div class="bubble {{ 'out' if sent else 'in' }}">
+                        <div class="who">{% if sent %}Sent to {{ t.to_name or t.to_id }}{% else %}Received from {{ t.from_name or t.from_id }}{% endif %}</div>
+                        <div class="amt">{{ '-' if sent else '+' }}{{ format_currency(t.amount) }}</div>
+                        <div class="meta"><span class="txn">{{ t.txn_id }}</span><span>{{ t.time_display|default(t.created_at_display) }}</span>{% if sent %}<i class="bi bi-check2-all"></i>{% endif %}</div>
                     </div>
                     {% endfor %}
-                    {% else %}
-                    <div class="text-center py-5">
-                        <i class="bi bi-inbox fs-1 text-muted"></i>
-                        <p class="text-muted mt-2 mb-0">No approved referrals yet. Share your link to get started!</p>
-                    </div>
-                    {% endif %}
+                </div>
+                <div class="dx-empty {{ 'd-none' if wallet_txns else '' }}" id="txnEmpty">
+                    <i class="bi bi-chat-square-heart"></i>
+                    <p><b>No payments yet</b><br>Send money to a friend and it will show up here like a chat.</p>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <section class="dx-card rise" style="--d:.15s">
+            <div class="dx-card-head">
+                <h3><i class="bi bi-people-fill"></i> Recent referrals</h3>
+                <span class="dx-badge">{{ referrals|length }}</span>
+            </div>
+            <div class="dx-list">
+                {% if referrals %}
+                {% for ref in referrals %}
+                <div class="chat-row">
+                    <div class="avatar">{{ ref.full_name[0]|upper if ref.full_name else '?' }}</div>
+                    <div>
+                        <div class="name">{{ ref.full_name }}</div>
+                        <div class="sub"><i class="bi bi-check2-all" style="color:var(--wa-tick)"></i> Approved</div>
+                    </div>
+                    <div class="time">
+                        <div class="text-success fw-bold">+₹100.00</div>
+                        {{ ref.approved_at.strftime('%d %b %Y') if ref.approved_at else ref.created_at.strftime('%d %b %Y') }}
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="dx-empty">
+                    <i class="bi bi-person-plus"></i>
+                    <p><b>No approved referrals yet</b><br>Share your link above to light your first hexagon side.</p>
+                    <a class="dx-btn dx-btn-wa" href="#invite"><i class="bi bi-whatsapp"></i> Invite on WhatsApp</a>
+                </div>
+                {% endif %}
+            </div>
+        </section>
     </div>
 
-    {# ── Level progress ── #}
-    <div class="card mb-5">
-        <div class="card-header"><h5 class="mb-0"><i class="bi bi-bar-chart-fill text-success"></i> Level Progress</h5></div>
-        <div class="card-body">
+    {# ═════════ Level progress ═════════ #}
+    <section class="dx-card rise" style="--d:.1s">
+        <div class="dx-card-head"><h3><i class="bi bi-bar-chart-fill"></i> Level progress</h3></div>
+        <div class="dx-card-body">
             {% set rc = user.referral_count or 0 %}
             {% set next_level = 1 if rc < 1 else 5 if rc < 5 else 10 if rc < 10 else 25 if rc < 25 else 50 %}
             {% set progress = ([rc / next_level * 100, 100]|min) %}
-            <div class="d-flex justify-content-between align-items-end mb-2">
-                <div><span class="display-6 fw-bold">{{ rc }}</span> <span class="text-muted">approved referrals</span></div>
-                <div class="text-muted small">Next level at {{ next_level }}{% if rc >= 50 %} · max level reached{% endif %}</div>
+            <div class="dx-prog-top">
+                <div><span class="dx-prog-num">{{ rc }}</span> <span class="dx-muted">approved referrals</span></div>
+                <div class="dx-muted">{% if rc >= 50 %}Max level reached{% else %}Next level at {{ next_level }}{% endif %}</div>
             </div>
-            <div class="progress" style="height: 8px; background: var(--wa-input);">
-                <div class="progress-bar" style="width: {{ progress }}%; background: linear-gradient(90deg, #00a884, #25d366);"></div>
-            </div>
-            <div class="d-flex justify-content-between text-muted small mt-2">
+            <div class="dx-bar"><span style="width: {{ progress }}%"></span></div>
+            <div class="dx-prog-ends">
                 <span>{{ user.user_level or 'Starter' }}</span>
-                <span>{{ 'Bronze' if rc < 1 else 'Silver' if rc < 5 else 'Gold' if rc < 10 else 'Diamond' if rc < 25 else 'Legend' if rc < 50 else 'Max Level' }}</span>
+                <span>{{ 'Bronze' if rc < 1 else 'Silver' if rc < 5 else 'Gold' if rc < 10 else 'Diamond' if rc < 25 else 'Legend' if rc < 50 else 'Max level' }}</span>
             </div>
         </div>
-    </div>
-</div>
+    </section>
+</main>
+
+{# ═════════ Bottom navigation (phones) ═════════ #}
+<nav class="dx-bottomnav" aria-label="Quick navigation">
+    <a href="#top" class="active"><i class="bi bi-house-door-fill"></i><span>Home</span></a>
+    <a href="#hexagons"><i class="bi bi-hexagon-fill"></i><span>Hexagons</span></a>
+    {% if wallet_enabled and wallet %}<button type="button" class="dx-fab" data-open-pay aria-label="Send money"><i class="bi bi-send-fill"></i></button>{% else %}<span></span>{% endif %}
+    <a href="#activity"><i class="bi bi-chat-dots-fill"></i><span>Activity</span></a>
+    <a href="{{ url_for('edit_profile') }}"><i class="bi bi-person-fill"></i><span>Profile</span></a>
+</nav>
 
 {# ═════════ Payment UI: bottom sheet + full-screen result stage ═════════ #}
 {% if wallet_enabled and wallet %}
@@ -234,97 +227,95 @@
     <div class="pay-sheet">
         <div class="pay-grab"></div>
 
+        {# step 1: who + how much #}
         <div id="payStep1">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="mb-0 fw-bold"><i class="bi bi-send-fill text-success"></i> Send money</h5>
-                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            <div class="pay-head">
+                <span class="pay-x-spacer"></span>
+                <h5><i class="bi bi-send-fill"></i> Send money</h5>
+                <button type="button" class="pay-x" data-close-pay aria-label="Close"><i class="bi bi-x-lg"></i></button>
             </div>
-            <label class="form-label mt-2" for="payTo">Recipient's Wallet ID</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
-                <input type="text" id="payTo" class="form-control font-monospace" placeholder="16-character Wallet ID" maxlength="16" autocomplete="off" autocapitalize="characters" inputmode="text">
+            <label class="pay-label" for="payTo">Recipient's Wallet ID</label>
+            <div class="pay-field"><i class="bi bi-person-badge"></i>
+                <input type="text" id="payTo" class="font-monospace" placeholder="16-character Wallet ID" maxlength="16" autocomplete="off" autocapitalize="characters" inputmode="text">
             </div>
-            <div class="text-center mt-4">
-                <div class="d-flex justify-content-center align-items-baseline">
-                    <span class="fs-1 fw-bold text-muted me-1">₹</span>
-                    <input type="number" id="payAmount" class="pay-amount-input" placeholder="0" min="1" step="0.01" inputmode="decimal" style="max-width: 240px;">
-                </div>
-                <div class="d-flex justify-content-center gap-2 mt-2 flex-wrap">
-                    <button type="button" class="pay-chip" data-amt="50">₹50</button>
-                    <button type="button" class="pay-chip" data-amt="100">₹100</button>
-                    <button type="button" class="pay-chip" data-amt="200">₹200</button>
-                    <button type="button" class="pay-chip" data-amt="500">₹500</button>
-                </div>
+            <div class="pay-amount-wrap">
+                <span class="pay-rupee">₹</span>
+                <input type="number" id="payAmount" class="pay-amount-input" placeholder="0" min="1" step="0.01" inputmode="decimal">
+            </div>
+            <div class="pay-chips">
+                <button type="button" class="pay-chip" data-amt="50">₹50</button>
+                <button type="button" class="pay-chip" data-amt="100">₹100</button>
+                <button type="button" class="pay-chip" data-amt="200">₹200</button>
+                <button type="button" class="pay-chip" data-amt="500">₹500</button>
             </div>
             <div class="pay-err" id="payErr1" role="alert"></div>
             <button type="button" class="pay-swipe" id="payNext"><span style="position:relative;z-index:1">Proceed <i class="bi bi-arrow-right"></i></span></button>
         </div>
 
+        {# step 2: confirm payee #}
         <div id="payStep2" hidden>
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <button type="button" class="btn btn-sm btn-outline-light" id="payBack"><i class="bi bi-arrow-left"></i></button>
-                <h5 class="mb-0 fw-bold">Confirm payment</h5>
-                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            <div class="pay-head">
+                <button type="button" class="pay-x" id="payBack" aria-label="Back"><i class="bi bi-arrow-left"></i></button>
+                <h5>Confirm payment</h5>
+                <button type="button" class="pay-x" data-close-pay aria-label="Close"><i class="bi bi-x-lg"></i></button>
             </div>
             <div class="pay-payee">
                 <div class="avatar" id="payPayeeAv">?</div>
-                <div class="flex-grow-1 min-w-0">
+                <div class="pay-payee-text">
                     <div class="nm" id="payPayeeName">—</div>
-                    <div class="id text-truncate" id="payPayeeId">—</div>
+                    <div class="id" id="payPayeeId">—</div>
                 </div>
                 <span class="pay-verified"><i class="bi bi-patch-check-fill"></i> Verified</span>
             </div>
-            <div class="text-center my-4">
-                <div class="text-muted small">You are paying</div>
-                <div class="display-5 fw-bold" id="payConfirmAmt">₹0.00</div>
-                <div class="text-muted small mt-1">From your wallet · instant · no fees</div>
+            <div class="pay-confirm-amt">
+                <div class="pay-hint">You are paying</div>
+                <div class="pay-big" id="payConfirmAmt">₹0.00</div>
+                <div class="pay-hint">From your wallet · instant · no fees</div>
             </div>
             <div class="pay-err" id="payErr2" role="alert"></div>
             <button type="button" class="pay-swipe" id="payConfirm">Continue to PIN</button>
         </div>
 
-        {# step 3: enter PIN #}
+        {# step 3: enter PIN (paying, or checking the current PIN before a change) #}
         <div id="payStep3" hidden>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <button type="button" class="btn btn-sm btn-outline-light" id="payPinBack"><i class="bi bi-arrow-left"></i></button>
-                <h5 class="mb-0 fw-bold"><i class="bi bi-shield-lock-fill text-success"></i> Enter PIN</h5>
-                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            <div class="pay-head">
+                <button type="button" class="pay-x" id="payPinBack" aria-label="Back"><i class="bi bi-arrow-left"></i></button>
+                <h5><i class="bi bi-shield-lock-fill"></i> <span id="payEnterTitle">Enter PIN</span></h5>
+                <button type="button" class="pay-x" data-close-pay aria-label="Close"><i class="bi bi-x-lg"></i></button>
             </div>
-            <div class="text-center text-muted small mb-3" id="payPinFor"></div>
+            <div class="pay-hint center" id="payPinFor"></div>
             <div class="pin-dots" id="pinDotsEnter" aria-label="PIN entry"></div>
             <div class="pay-err" id="payErr3" role="alert"></div>
             <div class="pin-pad" id="pinPadEnter"></div>
-            <div class="text-center mt-2"><a href="#" id="payForgotPin" class="small">Forgot PIN?</a></div>
+            <div class="pay-forgot"><a href="#" id="payForgotPin">Forgot PIN?</a></div>
         </div>
 
-        {# step 4: create PIN (first payment) #}
+        {# step 4: create / choose a new PIN #}
         <div id="payStep4" hidden>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span style="width:32px"></span>
-                <h5 class="mb-0 fw-bold" id="payPinTitle">Create payment PIN</h5>
-                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            <div class="pay-head">
+                <span class="pay-x-spacer"></span>
+                <h5 id="payPinTitle">Create payment PIN</h5>
+                <button type="button" class="pay-x" data-close-pay aria-label="Close"><i class="bi bi-x-lg"></i></button>
             </div>
-            <div class="text-center text-muted small mb-3" id="payPinSub"></div>
+            <div class="pay-hint center" id="payPinSub"></div>
             <div class="pin-dots" id="pinDotsCreate" aria-label="New PIN"></div>
             <div class="pay-err" id="payErr4" role="alert"></div>
             <div class="pin-pad" id="pinPadCreate"></div>
         </div>
 
-        {# step 5: change / reset PIN #}
+        {# step 5: forgot PIN -> prove it's you with the account password #}
         <div id="payStep5" hidden>
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <span style="width:32px"></span>
-                <h5 class="mb-0 fw-bold"><i class="bi bi-key-fill text-success"></i> Change PIN</h5>
-                <button type="button" class="btn-close" data-close-pay aria-label="Close"></button>
+            <div class="pay-head">
+                <button type="button" class="pay-x" id="payPwdBack" aria-label="Back"><i class="bi bi-arrow-left"></i></button>
+                <h5><i class="bi bi-key-fill"></i> Reset PIN</h5>
+                <button type="button" class="pay-x" data-close-pay aria-label="Close"><i class="bi bi-x-lg"></i></button>
             </div>
-            <label class="form-label" for="pinCurrent" id="pinCurrentHint">Current PIN — or your account password if you forgot it.</label>
-            <input type="password" id="pinCurrent" class="form-control mb-3" autocomplete="current-password">
-            <label class="form-label" for="pinNew">New 4-digit PIN</label>
-            <input type="password" id="pinNew" class="form-control mb-3 font-monospace" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off">
-            <label class="form-label" for="pinNew2">Confirm new PIN</label>
-            <input type="password" id="pinNew2" class="form-control font-monospace" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off">
-            <div class="pay-err" id="payPinErr" role="alert"></div>
-            <button type="button" class="pay-swipe" id="payPinSave"><span style="position:relative;z-index:1">Save PIN</span></button>
+            <p class="pay-hint center">Enter your account password to choose a new PIN.</p>
+            <div class="pay-field"><i class="bi bi-lock-fill"></i>
+                <input type="password" id="payPwd" placeholder="Account password" autocomplete="current-password">
+            </div>
+            <div class="pay-err" id="payPwdErr" role="alert"></div>
+            <button type="button" class="pay-swipe" id="payPwdContinue"><span style="position:relative;z-index:1">Continue</span></button>
         </div>
     </div>
 </div>
@@ -354,12 +345,12 @@
         <div><span>New balance</span><span id="payBal">—</span></div>
     </div>
     <div class="pay-actions pay-ok-only flex reveal d2">
-        <button type="button" class="btn btn-outline-light" id="payCopyTxn"><i class="bi bi-clipboard"></i> Copy ID</button>
-        <button type="button" class="btn btn-primary" id="payDone"><i class="bi bi-check2-all"></i> Done</button>
+        <button type="button" class="dx-btn dx-btn-ghost" id="payCopyTxn"><i class="bi bi-clipboard"></i> Copy ID</button>
+        <button type="button" class="dx-btn dx-btn-wa" id="payDone"><i class="bi bi-check2-all"></i> Done</button>
     </div>
     <div class="pay-actions pay-fail-only reveal d1">
-        <button type="button" class="btn btn-outline-light" id="payClose" onclick="document.getElementById('payStage').classList.remove('open','is-fail')">Close</button>
-        <button type="button" class="btn btn-primary" id="payRetry"><i class="bi bi-arrow-repeat"></i> Try again</button>
+        <button type="button" class="dx-btn dx-btn-ghost" onclick="document.getElementById('payStage').classList.remove('open','is-fail')">Close</button>
+        <button type="button" class="dx-btn dx-btn-wa" id="payRetry"><i class="bi bi-arrow-repeat"></i> Try again</button>
     </div>
 </div>
 {% endif %}
@@ -370,15 +361,41 @@
 <script src="{{ url_for('static', filename='js/payments.js') }}"></script>
 <script>
 (function () {
+    // ── greeting by the visitor's local time ──
+    const h = new Date().getHours();
+    document.getElementById("dxGreeting").textContent = h < 5 ? "Hello" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Hello";
+
+    // ── profile menu ──
+    const menu = document.getElementById("dxMenu"), mbtn = document.getElementById("dxMenuBtn");
+    mbtn.addEventListener("click", (e) => { e.stopPropagation(); const o = menu.classList.toggle("open"); mbtn.setAttribute("aria-expanded", o); });
+    document.addEventListener("click", () => { menu.classList.remove("open"); mbtn.setAttribute("aria-expanded", "false"); });
+
+    // ── tap-to-copy tiles/buttons ──
+    document.querySelectorAll("[data-copy]").forEach((el) => el.addEventListener("click", () => copyToClipboard(el.getAttribute("data-copy"))));
+
+    // ── balance counts up on load ──
+    const bal = document.getElementById("walletBalance");
+    if (bal && bal.dataset.value && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const to = parseFloat(bal.dataset.value), t0 = performance.now(), fmt = (n) => "\u20b9" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const step = (t) => { const p = Math.min(1, (t - t0) / 900); bal.textContent = fmt(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+        requestAnimationFrame(step);
+    }
+
+    // ── bottom nav: highlight the section in view ──
+    const links = [...document.querySelectorAll(".dx-bottomnav a[href^='#']")];
+    const spy = new IntersectionObserver((es) => es.forEach((e) => {
+        if (e.isIntersecting) links.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + e.target.id));
+    }), { rootMargin: "-40% 0px -50% 0px" });
+    ["top", "hexagons", "activity"].forEach((id) => { const el = document.getElementById(id); if (el) spy.observe(el); });
+
+    // ── live hexagon levels ──
     const levelsWrap = document.getElementById("myNetworkWidget");
     const pendingEl = document.getElementById("totalPendingCount");
     const approvedEl = document.getElementById("approvedCount");
     const REF_LINK = {{ ref_link|tojson }};
     let lastLevelsKey = null;
 
-
-    // Keep the "Approved Referrals" stat live
-    function loadChain() {
+    function loadChain() {  // keeps the "Approved referrals" tile live
         return fetch("{{ url_for('my_network_api') }}", { credentials: "same-origin" })
             .then((r) => r.json())
             .then((data) => {
@@ -386,13 +403,12 @@
                 if (approvedEl) approvedEl.textContent = data.satellites.filter((s) => s.status === "approved").length;
             }).catch(() => {});
     }
-
     function loadLevels() {
         return fetch("{{ url_for('my_network_levels_api') }}", { credentials: "same-origin" })
             .then((r) => r.json())
             .then((data) => {
                 if (data.error || !data.levels) {
-                    if (lastLevelsKey === null) levelsWrap.innerHTML = '<div class="hexnet-detail-empty">Could not load your network right now.</div>';
+                    if (lastLevelsKey === null) levelsWrap.innerHTML = '<div class="dx-empty"><i class="bi bi-wifi-off"></i><p>Could not load your network right now.</p></div>';
                     return;
                 }
                 if (pendingEl) pendingEl.textContent = data.totalPending || 0;
@@ -403,13 +419,11 @@
                 HexNetwork.attachLevelGridAddSlots(levelsWrap, REF_LINK, copyToClipboard);
             })
             .catch(() => {
-                if (lastLevelsKey === null) levelsWrap.innerHTML = '<div class="hexnet-detail-empty">Could not load your network right now.</div>';
+                if (lastLevelsKey === null) levelsWrap.innerHTML = '<div class="dx-empty"><i class="bi bi-wifi-off"></i><p>Could not load your network right now.</p></div>';
             });
     }
-
     function refresh() { loadChain(); loadLevels(); }
     refresh();
-    // Live: when an admin approves someone, the side fills in without a reload
     setInterval(() => { if (!document.hidden) refresh(); }, 20000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 })();
@@ -421,26 +435,32 @@
     const pane = document.getElementById("txnPane");
     const empty = document.getElementById("txnEmpty");
     if (pane) pane.scrollTop = pane.scrollHeight;
+    const money = (n) => Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     WalletPay.init({
         transferUrl: "{{ url_for('wallet_transfer') }}",
         recipientUrl: "{{ url_for('wallet_recipient') }}",
         pinSetUrl: "{{ url_for('wallet_pin_set') }}",
+        pinVerifyUrl: "{{ url_for('wallet_pin_verify') }}",
         hasPin: {{ 'true' if has_pin else 'false' }},
         myId: {{ user.public_user_id|tojson }},
         onSuccess: function (d) {
             // live-update balance + add the new "sent" bubble, no reload needed
             if (bal) {
-                bal.textContent = "\u20b9" + Number(d.new_balance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                bal.textContent = "\u20b9" + money(d.new_balance);
                 bal.classList.remove("balance-bump"); void bal.offsetWidth; bal.classList.add("balance-bump");
             }
             if (empty) empty.classList.add("d-none");
             const esc = HexNetwork.esc;
+            const seps = list.querySelectorAll(".chat-day span");
+            if (!seps.length || seps[seps.length - 1].textContent !== "Today") {
+                const day = document.createElement("div"); day.className = "chat-day"; day.innerHTML = "<span>Today</span>"; list.appendChild(day);
+            }
             const b = document.createElement("div");
             b.className = "bubble out";
             b.innerHTML = `<div class="who">Sent to ${esc(d.to_name)}</div>
-                <div class="amt">-\u20b9${Number(d.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                <div class="meta"><span class="txn">${esc(d.txn_id)}</span><span>${esc(d.created_at_display || "")}</span><i class="bi bi-check2-all"></i></div>`;
+                <div class="amt">-\u20b9${money(d.amount)}</div>
+                <div class="meta"><span class="txn">${esc(d.txn_id)}</span><span>${esc(d.time_display || d.created_at_display || "")}</span><i class="bi bi-check2-all"></i></div>`;
             list.appendChild(b);
             if (pane) pane.scrollTo({ top: pane.scrollHeight, behavior: "smooth" });
         },
